@@ -1,0 +1,84 @@
+name: Essensys Firmware Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Job 1 : Tests unitaires + integration (rapide, pas de Docker)
+  unit-tests:
+    name: Tests (host)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Tests unitaires BP
+        run: make -C tests/bp run_tests
+
+      - name: Tests unitaires BA
+        run: make -C tests/ba run_tests
+
+      - name: Tests integration
+        run: make -C tests/integration run_tests
+
+  # Job 2 : Build BP (Docker + m68k-elf-gcc)
+  build-bp:
+    name: Build BP (SC944D)
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build Docker image
+        run: docker build -t essensys-builder .
+
+      - name: Compile firmware BP
+        run: docker run --rm -v ${{ github.workspace }}:/workspace essensys-builder make -C /workspace bp
+
+      - name: Report size
+        run: docker run --rm -v ${{ github.workspace }}:/workspace essensys-builder m68k-elf-size /workspace/bp/BP_MQX_ETH.elf
+
+      - name: Upload artefacts BP
+        uses: actions/upload-artifact@v4
+        with:
+          name: BP_MQX_ETH
+          path: |
+            bp/BP_MQX_ETH.elf
+            bp/BP_MQX_ETH.s19
+            bp/BP_MQX_ETH.map
+          retention-days: 30
+
+  # Job 3 : Build BA x3 (Docker + XC8, matrice)
+  build-ba:
+    name: Build BA (${{ matrix.board }})
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    strategy:
+      matrix:
+        board: [SC940, SC941C, SC942C]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build Docker image
+        run: docker build -t essensys-builder .
+
+      - name: Compile firmware ${{ matrix.board }}
+        run: docker run --rm -v ${{ github.workspace }}:/workspace essensys-builder make -C /workspace/ba BOARD=${{ matrix.board }}
+
+      - name: Upload artefact ${{ matrix.board }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.board }}
+          path: ba/${{ matrix.board }}.hex
+          retention-days: 30

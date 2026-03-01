@@ -35,7 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Build crosstool-NG 1.26.0 from source
 WORKDIR /tmp/ct-ng-src
 RUN git clone --depth 1 --branch crosstool-ng-1.26.0 \
-        https://github.com/crosstool-ng/crosstool-ng.git . && \
+    https://github.com/crosstool-ng/crosstool-ng.git . && \
     ./bootstrap && \
     ./configure --prefix=/opt/ct-ng && \
     make -j"$(nproc)" && \
@@ -64,6 +64,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     python3 \
     ca-certificates \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # --- m68k-elf-gcc (ColdFire V2 MCF52259) ---
@@ -74,28 +75,27 @@ ENV PATH="/opt/x-tools/m68k-elf/bin:${PATH}"
 
 # --- Microchip XC8 compiler (PIC16F946, mode Free) ---
 # ============================================================
-# IMPORTANT : L'installeur XC8 n'est PAS redistribuable.
-# Vous devez le telecharger manuellement AVANT de lancer docker build.
+# L'installeur XC8 est téléchargé dynamiquement lors du build docker.
 #
-# 1. Aller sur https://www.microchip.com/en-us/tools-resources/develop/mplab-xc-compilers/xc8
-# 2. Telecharger la version Linux x86_64 (fichier .run)
-# 3. Renommer le fichier en "xc8-installer.run"
-# 4. Placer le fichier dans le meme repertoire que ce Dockerfile
-# 5. Lancer : docker build -t essensys-builder .
-#
-# Pour specifier un nom de fichier different :
-#   docker build --build-arg XC8_INSTALLER=xc8-v2.46-full-install-linux-x64-installer.run -t essensys-builder .
+# Sans XC8 (build BP uniquement) :
+#   docker build --build-arg SKIP_XC8=1 -t essensys-builder .
 # ============================================================
-ARG XC8_INSTALLER=xc8-installer.run
-COPY ${XC8_INSTALLER} /tmp/xc8-installer.run
-RUN chmod +x /tmp/xc8-installer.run && \
-    /tmp/xc8-installer.run \
-        --mode unattended \
-        --unattendedmodeui none \
-        --netservername "" \
-        --LicenseType FreeMode \
-        --prefix /opt/microchip/xc8 && \
-    rm -f /tmp/xc8-installer.run
+ARG SKIP_XC8=0
+ARG XC8_URL=https://ww1.microchip.com/downloads/aemDocuments/documents/DEV/ProductDocuments/SoftwareTools/xc8-v3.10-full-install-linux-x64-installer.run
+RUN if [ "$SKIP_XC8" = "0" ]; then \
+    echo "Downloading XC8..." && \
+    wget -q ${XC8_URL} -O /tmp/xc8_installer.run && \
+    chmod +x /tmp/xc8_installer.run && \
+    /tmp/xc8_installer.run \
+    --mode unattended \
+    --unattendedmodeui none \
+    --netservername "" \
+    --LicenseType FreeMode \
+    --prefix /opt/microchip/xc8 && \
+    rm -f /tmp/xc8_installer.run; \
+    else \
+    echo "XC8 skipped (SKIP_XC8=$SKIP_XC8)"; \
+    fi
 ENV PATH="/opt/microchip/xc8/bin:${PATH}"
 
 # --- Build orchestrator ---

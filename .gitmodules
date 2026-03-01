@@ -1,0 +1,3 @@
+[submodule "mqx"]
+	path = mqx
+	url = https://github.com/Mr-Shannon/Freescale_MQX_4_2

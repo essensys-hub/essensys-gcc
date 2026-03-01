@@ -1,0 +1,8 @@
+test_crc
+test_json
+test_md5
+test_base64
+test_aes
+test_s19
+test_table
+*.dSYM/

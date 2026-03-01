@@ -1,3 +1,6 @@
 [submodule "mqx"]
 	path = mqx
 	url = https://github.com/Mr-Shannon/Freescale_MQX_4_2
+[submodule "tests/unity"]
+	path = tests/unity
+	url = https://github.com/ThrowTheSwitch/Unity

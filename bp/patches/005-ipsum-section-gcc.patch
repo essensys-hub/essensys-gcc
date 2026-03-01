@@ -1,0 +1,14 @@
+--- a/mqx/mqx/source/psp/coldfire/ipsum.S
++++ b/mqx/mqx/source/psp/coldfire/ipsum.S
+@@ -35,7 +35,11 @@
+ #ifdef __ACF__
+         RSEG IPSUM:CODE (4)
+ #else
++#if defined(__GNUC__) && !defined(__CWCC__)
++        .section .text
++        .section IPSUM, "ax"
++#else
+         .text
+         .section IPSUM,16,x
+ #endif
++#endif

@@ -37,11 +37,11 @@ extern unsigned long  __BOOT_STACK_ADDRESS[];
 #define CFMDACC     0
 #define CFMSEC      0
 
-#ifdef __ICCCF__
+#if defined(__ICCCF__)
     #define BOOT_START __program_start
-    
+
     extern void __program_start(void);
-    
+
     #pragma diag_suppress=Pe177
     #pragma segment="CFMCONFIG"
 
@@ -55,11 +55,29 @@ extern unsigned long  __BOOT_STACK_ADDRESS[];
         CFMSEC,
     };
 #endif //BSPCFG_ENABLE_CFMPROTECT
-#else
+
+#elif defined(__GNUC__)
+    #define BOOT_START _startup
+
+    extern void _startup(void);
+
+#if BSPCFG_ENABLE_CFMPROTECT
+    __attribute__((section(".cfmconfig"), used))
+    const unsigned long _cfm[6] = {
+        KEY_UPPER,
+        KEY_LOWER,
+        CFMPROT,
+        CFMSACC,
+        CFMDACC,
+        CFMSEC,
+    };
+#endif //BSPCFG_ENABLE_CFMPROTECT
+
+#else /* CodeWarrior */
     #define BOOT_START __boot
-    
+
     extern void __boot(void);
-    
+
     #pragma define_section cfmconfig ".cfmconfig"  far_absolute RW
     #pragma explicit_zero_data on
 
@@ -73,7 +91,7 @@ extern unsigned long  __BOOT_STACK_ADDRESS[];
         CFMSEC,
     };
 #endif //BSPCFG_ENABLE_CFMPROTECT
-#endif //__ICCCF__
+#endif /* compiler selection */
 
 #if MQX_ROM_VECTORS
 
@@ -83,26 +101,31 @@ extern unsigned long  __BOOT_STACK_ADDRESS[];
     extern void __boot_exception(void);
 
     #define DEFAULT_VECTOR  __boot_exception
-    #ifdef __ICCCF__
+    #if defined(__ICCCF__)
         #pragma segment="INTVECRAM"
         const vector_entry ram_vector[256] @ "INTVECRAM" =
+    #elif defined(__GNUC__)
+        __attribute__((section(".vectors_ram"), used))
+        vector_entry ram_vector[256 + 6] =
     #else
         #pragma define_section vectors_ram ".vectors_ram" far_absolute RW
-        // array for excepion vectors in ram + space (6 words) for CW fun (when CW debuger handle exceptions, using(rewrite) VBR+0x408 address
-        __declspec(vectors_ram) vector_entry ram_vector[256 + 6] = 
-    #endif  
+        __declspec(vectors_ram) vector_entry ram_vector[256 + 6] =
+    #endif
     { (vector_entry)__BOOT_STACK_ADDRESS, BOOT_START };
 #endif
 
-/* 
+/*
 ** exception vector table - this table is really used
-*/ 
-#ifdef __ICCCF__
+*/
+#if defined(__ICCCF__)
     #pragma segment="INTVEC"
-    const vector_entry rom_vector[256] @ "INTVEC" = 
-#else    
+    const vector_entry rom_vector[256] @ "INTVEC" =
+#elif defined(__GNUC__)
+    __attribute__((section(".vectors_rom"), used))
+    const vector_entry rom_vector[256] =
+#else
     #pragma define_section vectors_rom ".vectors_rom" far_absolute R
-    __declspec(vectors_rom) vector_entry rom_vector[256] = 
+    __declspec(vectors_rom) vector_entry rom_vector[256] =
 #endif
 {
    (vector_entry)__BOOT_STACK_ADDRESS,

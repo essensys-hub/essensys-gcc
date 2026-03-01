@@ -1,0 +1,4 @@
+test_i2c_bp_ba
+test_http_protocol
+test_ota_s19
+*.dSYM/

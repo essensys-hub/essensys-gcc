@@ -22,7 +22,7 @@
 *   Flash boot code for Essensys SC944D (m52259evb).
 *   Initializes PLL from 25 MHz crystal to 80 MHz system clock,
 *   disables watchdog, resets PHY.
-*   No FlexBus/MRAM/LCD � SC944D does not use these.
+*   No FlexBus/MRAM/LCD — SC944D does not use these.
 *
 *END************************************************************************/
 
@@ -38,9 +38,9 @@
 *   Initialize PLL and basic hardware.
 *
 *   SC944D crystal: 25 MHz
-*     CCHR = 4 ? FREF = 25/5 = 5 MHz
-*     MFD  = 6 ? FSYS = 5 * 2*(6+2) = 80 MHz
-*     RFD  = 0 ? no post-divider
+*     CCHR = 4 → FREF = 25/5 = 5 MHz
+*     MFD  = 6 → FSYS = 5 * 2*(6+2) = 80 MHz
+*     RFD  = 0 → no post-divider
 *
 *   WARNING: Called before C runtime init. No global variables.
 *
@@ -59,7 +59,7 @@ void mcf5225_init
    reg_ptr->GPIO.PDDPAR = MCF5225_GPIO_PDDPAR_PST;
 
    /*
-   ** PLL configuration for 25 MHz crystal ? 80 MHz system clock
+   ** PLL configuration for 25 MHz crystal → 80 MHz system clock
    ** FREF = 25 MHz / (CCHR+1) = 25/5 = 5 MHz
    ** FSYS = FREF * 2 * (MFD+2) = 5 * 2 * 8 = 80 MHz
    */
@@ -80,7 +80,7 @@ void mcf5225_init
 
    reg_ptr->SCM.RAMBAR = MCF5225_SCM_RAMBAR_BA((uint32_t)__INTERNAL_SRAM_BASE) | MCF5225_SCM_RAMBAR_BDE;
 
-   /* PHY reset via RSTO � assert then deassert to reset DP83640TVV */
+   /* PHY reset via RSTO — assert then deassert to reset DP83640TVV */
    tmp_8[0] = reg_ptr->GPIO.PTIPAR;
    tmp_8[1] = reg_ptr->GPIO.PTJPAR;
    reg_ptr->GPIO.PTIPAR = 0x00;

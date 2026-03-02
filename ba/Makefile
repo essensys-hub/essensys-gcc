@@ -15,7 +15,7 @@ else
   $(error BOARD must be SC940, SC941C, or SC942C)
 endif
 
-CFLAGS = --chip=$(MCU) -DBOARD_TYPE=$(BOARD_TYPE)
+CFLAGS = -mcpu=$(MCU) -DBOARD_TYPE=$(BOARD_TYPE)
 SRCS   = $(wildcard $(SRCDIR)/*.c)
 
 $(OUTPUT).hex: $(SRCS)

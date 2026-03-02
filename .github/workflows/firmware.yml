@@ -26,7 +26,7 @@ jobs:
       - name: Tests integration
         run: make -C tests/integration run_tests
 
-  # Job 2 : Build BP (Docker + m68k-elf-gcc)
+  # Job 2 : Build BP (Docker + m68k-elf-gcc, sans XC8)
   build-bp:
     name: Build BP (SC944D)
     runs-on: ubuntu-latest
@@ -37,14 +37,14 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build Docker image
-        run: docker build -t essensys-builder .
+      - name: Build Docker image (BP only, skip XC8)
+        run: docker build --build-arg SKIP_XC8=1 -t essensys-bp-builder .
 
       - name: Compile firmware BP
-        run: docker run --rm -v ${{ github.workspace }}:/workspace essensys-builder make -C /workspace bp
+        run: docker run --rm -v ${{ github.workspace }}:/workspace essensys-bp-builder make -C /workspace bp
 
       - name: Report size
-        run: docker run --rm -v ${{ github.workspace }}:/workspace essensys-builder m68k-elf-size /workspace/bp/BP_MQX_ETH.elf
+        run: docker run --rm -v ${{ github.workspace }}:/workspace essensys-bp-builder m68k-elf-size /workspace/bp/BP_MQX_ETH.elf
 
       - name: Upload artefacts BP
         uses: actions/upload-artifact@v4
@@ -70,7 +70,17 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build Docker image
+      - name: Download XC8 installer
+        env:
+          XC8_DOWNLOAD_URL: ${{ secrets.XC8_DOWNLOAD_URL }}
+        run: |
+          if [ -z "$XC8_DOWNLOAD_URL" ]; then
+            echo "::error::Secret XC8_DOWNLOAD_URL is not set. Add the Microchip XC8 Linux installer download URL as a repository secret."
+            exit 1
+          fi
+          curl -fSL -o xc8-v3.10-full-install-linux-x64-installer.run "$XC8_DOWNLOAD_URL"
+
+      - name: Build Docker image (with XC8)
         run: docker build -t essensys-builder .
 
       - name: Compile firmware ${{ matrix.board }}

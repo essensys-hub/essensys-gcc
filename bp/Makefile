@@ -43,8 +43,8 @@ LDFLAGS  = -mcpu=52259 -nostdlib -Wl,-T,intflash.ld -Wl,--gc-sections \
 # Include paths
 # ---------------------------------------------------------------------------
 INCLUDES = \
-  -I $(MQX_SRC)/include \
   -I compat \
+  -I $(MQX_SRC)/include \
   -I $(MQX_SRC)/psp/coldfire \
   -I ../mqx/config/twrmcf52259 \
   -I ../mqx/config/common \

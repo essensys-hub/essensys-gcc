@@ -44,6 +44,7 @@ LDFLAGS  = -mcpu=52259 -nostdlib -Wl,-T,intflash.ld -Wl,--gc-sections \
 # ---------------------------------------------------------------------------
 INCLUDES = \
   -I $(MQX_SRC)/include \
+  -I compat \
   -I $(MQX_SRC)/psp/coldfire \
   -I ../mqx/config/twrmcf52259 \
   -I ../mqx/config/common \
@@ -52,9 +53,12 @@ INCLUDES = \
   -I $(IO)/i2c \
   -I $(IO)/spi_legacy \
   -I $(IO)/gpio \
+  -I $(IO)/gpio/mcf5225 \
   -I $(IO)/lwgpio \
   -I $(IO)/adc \
+  -I $(IO)/adc/mcf522xx \
   -I $(IO)/flashx \
+  -I $(IO)/flashx/freescale \
   -I $(IO)/enet \
   -I $(IO)/enet/phy \
   -I $(IO)/enet/mcf5xxx_fec \
@@ -64,8 +68,7 @@ INCLUDES = \
   -I $(IO)/pcb \
   -I $(IO)/io_mem \
   -I $(IO)/io_null \
-  -I $(RTCS_SRC)/include \
-  -I compat
+  -I $(RTCS_SRC)/include
 
 CFLAGS  += $(INCLUDES) -MMD -MP
 ASFLAGS += $(INCLUDES) -MMD -MP

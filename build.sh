@@ -45,6 +45,15 @@ build_bp() {
         exit 1
     fi
 
+    local psp_comp="${WORKSPACE}/mqx/mqx/source/psp/coldfire/psp_comp.h"
+    if ! grep -q "__GNUC__" "$psp_comp"; then
+        log_info "Patching psp_comp.h to support GCC..."
+        sed -i.bak '/#elif defined(__IAR_SYSTEMS_ICC__)/i \
+#elif defined(__GNUC__)\
+#include "gcc_comp.h"\
+' "$psp_comp"
+    fi
+
     make -C "${WORKSPACE}/bp"
     log_info "BP firmware build complete."
 }

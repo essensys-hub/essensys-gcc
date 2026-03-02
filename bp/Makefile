@@ -45,6 +45,8 @@ LDFLAGS  = -mcpu=52259 -nostdlib -Wl,-T,intflash.ld -Wl,--gc-sections \
 INCLUDES = \
   -I $(MQX_SRC)/include \
   -I $(MQX_SRC)/psp/coldfire \
+  -I ../mqx/config/twrmcf52259 \
+  -I ../mqx/config/common \
   -I $(BSP_DIR) \
   -I $(IO)/serial \
   -I $(IO)/i2c \

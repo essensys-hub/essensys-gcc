@@ -78,7 +78,7 @@ ASFLAGS += $(INCLUDES) -MMD -MP
 # ===========================================================================
 
 # --- PSP ColdFire (exclude chip variants not for MCF52259) -----------------
-PSP_EXCLUDE = mcf51jf.c mcf5441.c
+PSP_EXCLUDE = mcf51jf.c mcf5441.c cf_assert.c
 PSP_C_SRC   = $(filter-out $(addprefix $(MQX_SRC)/psp/coldfire/,$(PSP_EXCLUDE)), \
                 $(wildcard $(MQX_SRC)/psp/coldfire/*.c))
 PSP_S_SRC   = $(wildcard $(MQX_SRC)/psp/coldfire/*.S)
@@ -90,7 +90,7 @@ KERN_C_SRC  = $(wildcard $(MQX_SRC)/kernel/*.c)
 BSP_C_SRC   = $(wildcard $(BSP_DIR)/*.c)
 
 # --- Compat layer ----------------------------------------------------------
-COMPAT_SRC  = compat/newlib_stubs.c
+COMPAT_SRC  = compat/newlib_stubs.c compat/cf_assert.c
 
 # --- IO drivers (MCF5225x / MCF52xx variants only) -------------------------
 IO_C_SRC = \

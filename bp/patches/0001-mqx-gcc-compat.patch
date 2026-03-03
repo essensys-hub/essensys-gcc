@@ -1,0 +1,100 @@
+diff --git a/mqx/source/psp/coldfire/asm_mac.h b/mqx/source/psp/coldfire/asm_mac.h
+index 18a2f9d6..6a3a81cc 100644
+--- a/mqx/source/psp/coldfire/asm_mac.h
++++ b/mqx/source/psp/coldfire/asm_mac.h
+@@ -27,6 +27,34 @@
+ #ifndef __asm_mac_cw_h__
+ #define __asm_mac_cw_h__ 1
+ 
++#if defined(__GNUC__) && !defined(__CWCC__)
++/*
++ * GCC / GAS macros for ColdFire assembly.
++ *
++ * ELF targets do not prepend underscore to C symbols.
++ * ASM_EQUATE uses GAS ".equ symbol, value" syntax.
++ * Assemble .S files with:  -Wa,--register-prefix-optional
++ */
++#define ASM_PREFIX(x)     x
++#define ASM_EQUATE(label,value)  .equ label, value
++#define ASM_EXTERN(label)        .extern ASM_PREFIX(label)
++#define ASM_ALIGN(value)         .balign value
++#define ASM_PUBLIC(label)        .global ASM_PREFIX(label)
++#define ASM_CONST16(value)       .short value
++#define ASM_CONST32(value)       .long value
++#define ASM_LABEL(label)         label:
++#define ASM_LABEL_CONST32(label,value) ASM_LABEL(label) ASM_CONST32(value)
++#define ASM_CODE_SECTION(name)   .section name, "ax"
++#define ASM_DATA_SECTION(name)   .section name, "aw"
++#define ASM_END                  .end
++#define ASM_COMP_SPECIFIC_DIRECTIVES
++
++#define ASM_PUBLIC_BEGIN(name)
++#define ASM_PUBLIC_FUNC(name)
++#define ASM_PUBLIC_END(name)
++
++#else
++
+ #if defined(__CWARM__)
+ #define ASM_PREFIX(x)	x
+ #else
+@@ -50,4 +78,7 @@
+ #define ASM_PUBLIC_FUNC(name)     
+ #define ASM_PUBLIC_END(name)
+ 
++
++#endif /* !__GNUC__ */
++
+ #endif /* __asm_mac_cw_h__ */
+diff --git a/mqx/source/psp/coldfire/dispatch.S b/mqx/source/psp/coldfire/dispatch.S
+index bfe6c3bb..0881f721 100644
+--- a/mqx/source/psp/coldfire/dispatch.S
++++ b/mqx/source/psp/coldfire/dispatch.S
+@@ -37,10 +37,15 @@
+ 
+ #ifdef __ACF__
+         RSEG KERNEL:CODE (4)
++#else
++#if defined(__GNUC__) && !defined(__CWCC__)
++        .section .text
++        .section KERNEL, "ax"
+ #else
+         .text
+         .section KERNEL,16,x
+ #endif
++#endif
+ 
+ ;FUNCTION*-------------------------------------------------------------------
+ ;
+diff --git a/mqx/source/psp/coldfire/ipsum.S b/mqx/source/psp/coldfire/ipsum.S
+index d13af532..d3c18550 100644
+--- a/mqx/source/psp/coldfire/ipsum.S
++++ b/mqx/source/psp/coldfire/ipsum.S
+@@ -34,10 +34,15 @@
+         ; End CR 2042
+ #ifdef __ACF__
+         RSEG IPSUM:CODE (4)
++#else
++#if defined(__GNUC__) && !defined(__CWCC__)
++        .section .text
++        .section IPSUM, "ax"
+ #else
+         .text
+         .section IPSUM,16,x
+ #endif
++#endif
+ 
+ ;FUNCTION*--------------------------------------------------------------
+ ;
+diff --git a/mqx/source/psp/coldfire/psp_prv.inc b/mqx/source/psp/coldfire/psp_prv.inc
+index f9512b0d..9c5fb858 100644
+--- a/mqx/source/psp/coldfire/psp_prv.inc
++++ b/mqx/source/psp/coldfire/psp_prv.inc
+@@ -274,7 +274,7 @@ SAVE_ALL_REGISTERS: .macro
+         lea.l   -4*16(sp),sp            ; make room on the stack
+         movem.l d3-d7,4*3(sp)           ; save regs (can optimize and
+         movem.l a2-a6,4*10(sp)          ; not save d0,d1,d2,a0,a1)
+-        move.w  #$4000,d0               ; set coldfire stack frame
++        move.w  #0x4000,d0              ; set coldfire stack frame
+         swap    d0
+         move.w  sr,d0
+         move.l  d0,4*15(sp)             ; save SR and format

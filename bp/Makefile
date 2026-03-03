@@ -34,7 +34,7 @@ CFLAGS   = -mcpu=52259 -msoft-float -ffreestanding -Os -g3 \
            -ffunction-sections -fdata-sections -fno-common -Wall -Wextra \
            -include compat/codewarrior.h
 
-ASFLAGS  = -mcpu=52259 -msoft-float -ffreestanding -g3
+ASFLAGS  = -mcpu=52259 -msoft-float -ffreestanding -g3 -Wa,--register-prefix-optional
 
 LDFLAGS  = -mcpu=52259 -nostdlib -Wl,-T,intflash.ld -Wl,--gc-sections \
            -Wl,-Map,$(TARGET).map
@@ -190,9 +190,16 @@ ALL_OBJS  = $(PSP_OBJS) $(BSP_OBJS) $(RTCS_OBJS) $(APP_OBJS)
 #  Build targets
 # ===========================================================================
 
-.PHONY: all size clean
+.PHONY: all size clean patch
 
-all: $(TARGET).elf $(TARGET).s19 size
+all: patch $(TARGET).elf $(TARGET).s19 size
+
+patch: .mqx_patched
+
+.mqx_patched:
+	@echo "Applying MQX GCC compatibility patches..."
+	@cd ../mqx && git apply ../bp/patches/0001-mqx-gcc-compat.patch || true
+	@touch .mqx_patched
 
 # --- Static libraries ------------------------------------------------------
 
@@ -231,11 +238,11 @@ clean:
 # ===========================================================================
 
 # MQX sources (paths starting with ../)
-$(BUILDDIR)/%.o: ../%.c
+$(BUILDDIR)/%.o: ../%.c | .mqx_patched
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILDDIR)/%.o: ../%.S
+$(BUILDDIR)/%.o: ../%.S | .mqx_patched
 	@mkdir -p $(dir $@)
 	$(AS) $(ASFLAGS) -c $< -o $@
 

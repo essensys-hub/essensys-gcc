@@ -67,7 +67,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     cppcheck \
     lcov \
-    gcov \
     && rm -rf /var/lib/apt/lists/*
 
 # --- m68k-elf-gcc (ColdFire V2 MCF52259) ---

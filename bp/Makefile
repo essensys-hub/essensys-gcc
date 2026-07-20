@@ -200,9 +200,13 @@ ALL_OBJS  = $(PSP_OBJS) $(BSP_OBJS) $(RTCS_OBJS) $(APP_OBJS)
 #  Build targets
 # ===========================================================================
 
-.PHONY: all size clean patch
+.PHONY: all build size clean patch
 
-all: patch $(TARGET).elf $(TARGET).s19 size
+all: build
+
+build: patch $(ARTIFACT_DIR)/$(TARGET_ELF) $(ARTIFACT_DIR)/$(TARGET_S19) size
+	@echo "✓ BP firmware built: $(ARTIFACT_DIR)/$(TARGET_ELF)"
+	@echo "✓ S-record: $(ARTIFACT_DIR)/$(TARGET_S19)"
 
 patch: .mqx_patched
 
@@ -238,12 +242,6 @@ $(ARTIFACT_DIR)/$(TARGET_S19): $(ARTIFACT_DIR)/$(TARGET_ELF)
 
 size: $(ARTIFACT_DIR)/$(TARGET_ELF)
 	$(SIZE) $<
-
-# --- Build target (main entry point) ----------------------------------------
-
-build: $(ARTIFACT_DIR)/$(TARGET_ELF) $(ARTIFACT_DIR)/$(TARGET_S19) size
-	@echo "✓ BP firmware built: $(ARTIFACT_DIR)/$(TARGET_ELF)"
-	@echo "✓ S-record: $(ARTIFACT_DIR)/$(TARGET_S19)"
 
 # --- Clean ------------------------------------------------------------------
 

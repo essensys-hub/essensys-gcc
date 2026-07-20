@@ -18,14 +18,24 @@ OBJCOPY  = $(CROSS)objcopy
 SIZE     = $(CROSS)size
 
 # ---------------------------------------------------------------------------
+# Versioning & Output
+# ---------------------------------------------------------------------------
+VERSION  ?= dev
+ARTIFACT_BASE = BP_MQX_ETH
+TARGET_ELF   = $(ARTIFACT_BASE)-$(VERSION).elf
+TARGET_S19   = $(ARTIFACT_BASE)-$(VERSION).s19
+TARGET_MAP   = $(ARTIFACT_BASE)-$(VERSION).map
+
+# ---------------------------------------------------------------------------
 # Directories (relative to bp/)
 # ---------------------------------------------------------------------------
 MQX_SRC  = ../mqx/mqx/source
 RTCS_SRC = ../mqx/rtcs/source
 IO       = $(MQX_SRC)/io
 BSP_DIR  = bsp/m52259evb
-BUILDDIR = build
-TARGET   = BP_MQX_ETH
+BUILDDIR = build/bp
+ARTIFACT_DIR = build/bp
+TARGET   = $(ARTIFACT_BASE)
 
 # ---------------------------------------------------------------------------
 # Flags
@@ -37,7 +47,7 @@ CFLAGS   = -mcpu=52259 -msoft-float -ffreestanding -Os -g3 \
 ASFLAGS  = -mcpu=52259 -msoft-float -ffreestanding -g3 -Wa,--register-prefix-optional
 
 LDFLAGS  = -mcpu=52259 -nostdlib -Wl,-T,intflash.ld -Wl,--gc-sections \
-           -Wl,-Map,$(TARGET).map
+           -Wl,-Map,$(ARTIFACT_DIR)/$(TARGET_MAP)
 
 # ---------------------------------------------------------------------------
 # Include paths
@@ -214,24 +224,31 @@ rtcs.a: $(RTCS_OBJS)
 
 # --- Final link -------------------------------------------------------------
 
-$(TARGET).elf: psp.a bsp.a rtcs.a $(APP_OBJS)
+$(ARTIFACT_DIR)/$(TARGET_ELF): psp.a bsp.a rtcs.a $(APP_OBJS)
+	@mkdir -p $(ARTIFACT_DIR)
 	$(CC) $(LDFLAGS) -o $@ $(APP_OBJS) \
 	  -Wl,--start-group psp.a bsp.a rtcs.a -lgcc -Wl,--end-group
 
 # --- S-record output --------------------------------------------------------
 
-$(TARGET).s19: $(TARGET).elf
+$(ARTIFACT_DIR)/$(TARGET_S19): $(ARTIFACT_DIR)/$(TARGET_ELF)
 	$(OBJCOPY) -O srec --srec-forceS3 --srec-len=32 $< $@
 
 # --- Size report ------------------------------------------------------------
 
-size: $(TARGET).elf
+size: $(ARTIFACT_DIR)/$(TARGET_ELF)
 	$(SIZE) $<
+
+# --- Build target (main entry point) ----------------------------------------
+
+build: $(ARTIFACT_DIR)/$(TARGET_ELF) $(ARTIFACT_DIR)/$(TARGET_S19) size
+	@echo "✓ BP firmware built: $(ARTIFACT_DIR)/$(TARGET_ELF)"
+	@echo "✓ S-record: $(ARTIFACT_DIR)/$(TARGET_S19)"
 
 # --- Clean ------------------------------------------------------------------
 
 clean:
-	rm -rf $(BUILDDIR) *.a *.elf *.s19 *.map
+	rm -rf $(BUILDDIR) *.a
 
 # ===========================================================================
 #  Compilation rules

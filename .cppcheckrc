@@ -1,0 +1,42 @@
+# cppcheck configuration for MISRA C 2012 analysis
+# SC944D firmware (BP + BA)
+
+[Cppcheck]
+# Enable all checks
+enable=all
+
+# Standard: C99 (firmware targets embedded systems)
+std=c99
+
+# Suppress system headers (too noisy)
+suppress=missingIncludeSystem
+
+# MISRA C 2012 addon
+addon=misra
+
+# Python path for addon (used in CI/CD)
+addon-python-path=/usr/bin/python3
+
+# Severity levels to report
+severity-list=error,warning
+
+# Force language detection
+language=c
+
+# Max allowed code complexity (Cyclomatic)
+max-complexity=15
+
+# Platforms (ColdFire uses 32-bit integers, 32-bit pointers)
+platform=unix32
+
+# Output format (XML for CI/CD parsing)
+output-file=reports/misra.json
+
+# Inline suppression: use // cppcheck-suppress ruleXXX
+inline-suppression=enabled
+
+# Performance: use -j for parallel analysis (controlled by caller)
+# threads=4
+
+# Directories to scan (set by caller: bp/C/ ba/source/)
+#  Paths: bp/C/*.c, ba/source/*.c

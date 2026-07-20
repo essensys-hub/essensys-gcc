@@ -65,6 +65,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     ca-certificates \
     wget \
+    cppcheck \
+    lcov \
+    gcov \
     && rm -rf /var/lib/apt/lists/*
 
 # --- m68k-elf-gcc (ColdFire V2 MCF52259) ---

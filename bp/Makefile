@@ -175,8 +175,8 @@ RTCS_C_SRC = \
   $(wildcard $(RTCS_SRC)/snmp/*.c) \
   $(wildcard $(RTCS_SRC)/tcpip/*.c)
 
-# --- Application (empty — sources will be added later) ---------------------
-APP_SRC  =
+# --- Application (minimal test application, will be replaced with full sources) ---
+APP_SRC  = main.c
 APP_OBJS = $(addprefix $(BUILDDIR)/, $(APP_SRC:.c=.o))
 
 # ===========================================================================

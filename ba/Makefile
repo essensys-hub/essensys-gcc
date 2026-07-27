@@ -11,7 +11,9 @@ else ifeq ($(BOARD),SC941C)
 else ifeq ($(BOARD),SC942C)
   BOARD_TYPE = TYPE_CHAMBRES
   OUTPUT     = SC942C
-else
+else ifneq ($(BOARD),)
+  # Only error on an explicitly-invalid BOARD. Empty BOARD is allowed so that
+  # `clean` and `all-boards` (which set BOARD per sub-make) parse without error.
   $(error BOARD must be SC940, SC941C, or SC942C)
 endif
 

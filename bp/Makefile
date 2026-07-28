@@ -192,7 +192,9 @@ RTCS_C_SRC = \
   $(wildcard $(RTCS_SRC)/tcpip/*.c)
 
 # --- Application (minimal test application, will be replaced with full sources) ---
-APP_SRC  = main.c
+# bootloader.c emits the fixed-address header sections (.APP_CRC/.APP_VERSION/
+# .APP_JUMP @ 0x3000) that the existing bootloader reads before launching.
+APP_SRC  = main.c bootloader.c
 APP_OBJS = $(addprefix $(BUILDDIR)/, $(APP_SRC:.c=.o))
 
 # ===========================================================================

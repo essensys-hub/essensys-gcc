@@ -30,9 +30,11 @@ EXTERN(_cfm __init_hardware)
 
 MEMORY
 {
-    vectors     (rx)  : ORIGIN = 0x00000000, LENGTH = 0x00000400
-    cfmprotrom  (r)   : ORIGIN = 0x00000400, LENGTH = 0x00000020
-    /* 0x00000420 – 0x00002FFF : existing bootloader — intentionally unmapped */
+    /* 0x00000000 – 0x00002FFF : reset vectors, CFM config and the existing
+     * bootloader — owned by the bootloader image, NOT part of this OTA
+     * application image. Intentionally unmapped here. This firmware is
+     * flashed at 0x3000 and reached via the bootloader's jump to .APP_JUMP;
+     * its own vector table lives at 0x3010 (VBR is set to it in boot.S). */
     rom         (rx)  : ORIGIN = 0x00003000, LENGTH = 0x0004B000  /* 0x3000–0x7DFFF */
     persist     (rw)  : ORIGIN = 0x0007E000, LENGTH = 0x00001000  /* 4 KB NOLOAD    */
     sram        (rwx) : ORIGIN = 0x20000000, LENGTH = 0x00010000  /* 64 KB          */
@@ -72,32 +74,15 @@ SECTIONS
     __FLASHX_SECT_SIZE             = 0x1000;
 
     /* ================================================================
-     *  Interrupt vector table (Flash, 0x00000000)
-     * ================================================================ */
-    .vectors :
-    {
-        __vector_table = .;
-        __VECTOR_TABLE_ROM_START = .;
-        KEEP(*(.vectors_rom))
-        . = ALIGN(0x4);
-    } > vectors
-
-    /* ================================================================
-     *  ColdFire Flash Module protection (0x00000400)
-     * ================================================================ */
-    .cfmprotect :
-    {
-        KEEP(*(.cfmconfig))
-        . = ALIGN(0x4);
-    } > cfmprotrom
-
-    /* ================================================================
-     *  Bootloader header — CRITICAL fixed-address sections
+     *  Bootloader header — CRITICAL fixed-address sections (0x3000)
      *
-     *  The existing bootloader reads these at absolute addresses:
+     *  The existing bootloader reads these at absolute addresses, then
+     *  jumps to .APP_JUMP:
      *    0x3000  CRC-16       (2 B)
      *    0x3002  Version      (2 B)
-     *    0x3004  jmp __boot   (≤ 8 B)
+     *    0x3004  jmp __boot   (6 B)
+     *  This is the FIRST thing in the application image (mirrors the
+     *  deployed CodeWarrior layout).
      * ================================================================ */
     .app_header :
     {
@@ -105,6 +90,33 @@ SECTIONS
         KEEP(*(.APP_VERSION))
         KEEP(*(.APP_JUMP))
         . = ALIGN(0x10);
+    } > rom
+
+    /* ================================================================
+     *  Application interrupt vector table (Flash, 0x3010)
+     *
+     *  Placed right after the header, matching the deployed firmware
+     *  (.vectors @ 0x3010). boot.S sets VBR = __VECTOR_TABLE_ROM_START,
+     *  so the vector base follows this section automatically.
+     * ================================================================ */
+    .vectors :
+    {
+        __vector_table = .;
+        __VECTOR_TABLE_ROM_START = .;
+        KEEP(*(.vectors_rom))
+        . = ALIGN(0x4);
+    } > rom
+
+    /* ================================================================
+     *  ColdFire Flash Module protection copy (0x3410)
+     *
+     *  The real CFM security config at 0x400 belongs to the bootloader
+     *  image; this copy mirrors the deployed application layout.
+     * ================================================================ */
+    .cfmprotect :
+    {
+        KEEP(*(.cfmconfig))
+        . = ALIGN(0x4);
     } > rom
 
     /* ================================================================

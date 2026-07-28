@@ -7,17 +7,21 @@
  *
  * Assembled with:  m68k-elf-gcc -mcpu=52259 -Wa,--register-prefix-optional
  *
- * Linker symbols required (from linker script):
+ * Linker symbols required (from linker script, see bp/intflash.ld):
  *   __BOOT_STACK_ADDRESS   Initial stack pointer (top of SRAM)
  *   __VECTOR_TABLE_ROM_START  Base of vector table in Flash
  *   __IPSBAR               Peripheral base address
  *   __INTERNAL_FLASH_BASE  Internal Flash start
  *   __INTERNAL_SRAM_BASE   Internal SRAM start
- *   __DATA_ROM             .data section LMA (load address in Flash)
- *   __DATA_RAM             .data section VMA (destination in RAM)
- *   __DATA_END             End of .data in RAM
- *   __BSS_START            Start of .bss
- *   __BSS_END              End of .bss
+ *   _sidata                .data section LMA (load address in Flash)
+ *   _sdata / _edata        .data section VMA start/end (destination in RAM)
+ *   _sbss / _ebss          .bss start/end (zero-initialized in RAM)
+ * (intflash.ld's own comments document these as the intended startup
+ *  contract: "Startup code copies LMA -> VMA using _sidata / _sdata /
+ *  _edata" and "Startup code zeroes _sbss -> _ebss". Note _sdata/_edata
+ *  span the whole .data output section (vectors_ram, usb_bdt, .data*,
+ *  .sdata*) — not just the __START_DATA/__END_DATA sub-range, which
+ *  would leave part of initialized data uncopied.)
  */
 
     .section .boot, "ax"
@@ -32,11 +36,21 @@
     .extern __IPSBAR
     .extern __INTERNAL_FLASH_BASE
     .extern __INTERNAL_SRAM_BASE
-    .extern __DATA_ROM
-    .extern __DATA_RAM
-    .extern __DATA_END
-    .extern __BSS_START
-    .extern __BSS_END
+    .extern _sidata
+    .extern _sdata
+    .extern _edata
+    .extern _sbss
+    .extern _ebss
+
+    /* ColdFire MOVEC control-register selectors.
+     * GAS's m68k register-name table only recognizes RAMBAR0/RAMBAR1
+     * mnemonics for classic 68040/68060 CPUs, not for ColdFire targets;
+     * on ColdFire these must be written as movec Rn,#<selector>. Values
+     * match the Freescale numeric constants (see
+     * mqx/source/psp/coldfire/types.inc, __ACF__ block: RAMBAR0=0xC04,
+     * RAMBAR1=0xC05). */
+    .equ    CF_RAMBAR0, 0xC04
+    .equ    CF_RAMBAR1, 0xC05
 
 /*
  * _startup / __boot — primary entry point after reset.
@@ -65,13 +79,13 @@ __boot:
     move.l  #__INTERNAL_FLASH_BASE, d0
     andi.l  #0xFFF80000, d0
     addi.l  #0x61, d0
-    movec   d0, rambar0
+    movec   d0, #CF_RAMBAR0
 
     /* RAMBAR1 — validate internal SRAM for code+data access */
     move.l  #__INTERNAL_SRAM_BASE, d0
     andi.l  #0xFFF80000, d0
     addi.l  #0x21, d0
-    movec   d0, rambar1
+    movec   d0, #CF_RAMBAR1
 
     /* Mask all interrupts in INTC0 and INTC1 */
     movea.l #__IPSBAR, a0
@@ -85,9 +99,9 @@ __boot:
     jsr     mcf5225_init
 
     /* Copy .data section from Flash (LMA) to SRAM (VMA) */
-    lea     __DATA_ROM, a0              /* source (Flash)                    */
-    lea     __DATA_RAM, a1              /* destination (SRAM)                */
-    lea     __DATA_END, a2              /* end marker                        */
+    lea     _sidata, a0                 /* source (Flash)                    */
+    lea     _sdata, a1                  /* destination (SRAM)                */
+    lea     _edata, a2                  /* end marker                        */
     bra.s   .Lcopy_check
 .Lcopy_loop:
     move.l  (a0)+, (a1)+
@@ -96,8 +110,8 @@ __boot:
     bhi.s   .Lcopy_loop
 
     /* Zero .bss section */
-    lea     __BSS_START, a0
-    lea     __BSS_END, a1
+    lea     _sbss, a0
+    lea     _ebss, a1
     moveq   #0, d0
     bra.s   .Lzero_check
 .Lzero_loop:

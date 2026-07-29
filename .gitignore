@@ -1,0 +1,35 @@
+# XC8 installer (not redistributable, ~94 MB)
+xc8-*.run
+
+# Build artifacts
+bp/build/
+bp/*.a
+bp/*.elf
+bp/*.s19
+bp/*.map
+ba/*.hex
+ba/*.o
+ba/*.lst
+ba/*.map
+
+# Test binaries
+tests/bp/test_*
+!tests/bp/test_*.c
+tests/ba/test_*
+!tests/ba/test_*.c
+tests/integration/test_*
+!tests/integration/test_*.c
+
+# macOS / editor / session junk
+.DS_Store
+.cursor/
+bp/.mqx_patched
+
+# Debug logs & captured job output (not source)
+*.zip
+logs_extracted/
+job_info.json
+job_log.txt
+log.txt
+run_logs.txt
+combined.patch

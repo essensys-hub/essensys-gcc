@@ -62,6 +62,7 @@ INCLUDES = \
   -I $(IO)/serial \
   -I $(IO)/i2c \
   -I $(IO)/spi_legacy \
+  -I $(IO)/spi_legacy/polled \
   -I $(IO)/gpio \
   -I $(IO)/gpio/mcf5225 \
   -I $(IO)/lwgpio \
@@ -98,6 +99,7 @@ KERN_C_SRC  = $(wildcard $(MQX_SRC)/kernel/*.c)
 
 # --- BSP m52259evb ---------------------------------------------------------
 BSP_C_SRC   = $(wildcard $(BSP_DIR)/*.c)
+BSP_S_SRC   = $(wildcard $(BSP_DIR)/*.S)
 
 # --- Compat layer ----------------------------------------------------------
 COMPAT_SRC  = compat/newlib_stubs.c compat/cf_assert.c
@@ -158,15 +160,29 @@ IO_C_SRC = \
   $(IO)/rtc/rtc_mcf5225.c \
   $(IO)/rtc/rtc_mcf52xx.c \
   $(IO)/timer/timer_mcf5225.c \
+  $(IO)/timer/timer_pit.c \
   $(IO)/pcb/io_pcb.c \
   $(IO)/pcb/io_pcb2.c \
   $(IO)/pcb/mqxa/pcb_mqxa.c \
   $(IO)/io_mem/io_mem.c \
   $(IO)/io_null/io_null.c
 
+# --- FIO (high-level buffered/formatted file I/O: fopen/fread/ioctl/...) ---
+# Referenced (extern) by the io_* driver layer above (_io_fopen, _io_ioctl,
+# etc.) but lives in its own directory, not under io/.
+FIO_C_SRC = $(wildcard $(MQX_SRC)/fio/*.c)
+
 # --- RTCS TCP/IP stack -----------------------------------------------------
+# The FTP *server* (ftpsrv_*.c) requires MFS (MQX File System) support
+# (mfs.h, MFS_* calls) which is not part of this minimal firmware build;
+# its command dispatch table (ftpsrv_commands[]) is shared by all
+# ftpsrv_*.c files, so they must be excluded as one unit. The FTP
+# *client* (ftpc*.c/ftpclnt.c) has no such dependency and is kept.
+RTCS_APPS_EXCLUDE = ftpsrv.c ftpsrv_cmd.c ftpsrv_cmd_file.c ftpsrv_cmd_transfer.c \
+                    ftpsrv_msg.c ftpsrv_supp.c ftpsrv_task.c
 RTCS_C_SRC = \
-  $(wildcard $(RTCS_SRC)/apps/*.c) \
+  $(filter-out $(addprefix $(RTCS_SRC)/apps/,$(RTCS_APPS_EXCLUDE)), \
+    $(wildcard $(RTCS_SRC)/apps/*.c)) \
   $(wildcard $(RTCS_SRC)/if/*.c) \
   $(wildcard $(RTCS_SRC)/media/*.c) \
   $(wildcard $(RTCS_SRC)/nat/*.c) \
@@ -176,7 +192,9 @@ RTCS_C_SRC = \
   $(wildcard $(RTCS_SRC)/tcpip/*.c)
 
 # --- Application (minimal test application, will be replaced with full sources) ---
-APP_SRC  = main.c
+# bootloader.c emits the fixed-address header sections (.APP_CRC/.APP_VERSION/
+# .APP_JUMP @ 0x3000) that the existing bootloader reads before launching.
+APP_SRC  = main.c bootloader.c
 APP_OBJS = $(addprefix $(BUILDDIR)/, $(APP_SRC:.c=.o))
 
 # ===========================================================================
@@ -188,9 +206,15 @@ PSP_OBJS  = $(patsubst ../%, $(BUILDDIR)/%, $(PSP_C_SRC:.c=.o)) \
             $(patsubst ../%, $(BUILDDIR)/%, $(PSP_S_SRC:.S=.o)) \
             $(patsubst ../%, $(BUILDDIR)/%, $(KERN_C_SRC:.c=.o))
 
+# Note: BSP_S_SRC objects use a distinct ".asm.o" suffix (not ".o") because
+# some BSP .S files share a basename with a sibling .c file (e.g. boot.S /
+# boot.c) — using ".o" for both would collide on the same object path and
+# silently drop the assembly file from the build (only one rule would fire).
 BSP_OBJS  = $(addprefix $(BUILDDIR)/, $(BSP_C_SRC:.c=.o)) \
+            $(addprefix $(BUILDDIR)/, $(BSP_S_SRC:.S=.asm.o)) \
             $(addprefix $(BUILDDIR)/, $(COMPAT_SRC:.c=.o)) \
-            $(patsubst ../%, $(BUILDDIR)/%, $(IO_C_SRC:.c=.o))
+            $(patsubst ../%, $(BUILDDIR)/%, $(IO_C_SRC:.c=.o)) \
+            $(patsubst ../%, $(BUILDDIR)/%, $(FIO_C_SRC:.c=.o))
 
 RTCS_OBJS = $(patsubst ../%, $(BUILDDIR)/%, $(RTCS_C_SRC:.c=.o))
 
@@ -231,7 +255,7 @@ rtcs.a: $(RTCS_OBJS)
 $(ARTIFACT_DIR)/$(TARGET_ELF): psp.a bsp.a rtcs.a $(APP_OBJS)
 	@mkdir -p $(ARTIFACT_DIR)
 	$(CC) $(LDFLAGS) -o $@ $(APP_OBJS) \
-	  -Wl,--start-group psp.a bsp.a rtcs.a -lgcc -Wl,--end-group
+	  -Wl,--start-group psp.a bsp.a rtcs.a -lc -lgcc -Wl,--end-group
 
 # --- S-record output --------------------------------------------------------
 
@@ -265,6 +289,10 @@ $(BUILDDIR)/%.o: ../%.S | .mqx_patched
 $(BUILDDIR)/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILDDIR)/%.asm.o: %.S
+	@mkdir -p $(dir $@)
+	$(AS) $(ASFLAGS) -c $< -o $@
 
 # ===========================================================================
 #  Auto-generated dependencies

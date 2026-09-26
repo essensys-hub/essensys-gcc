@@ -14,6 +14,11 @@
 /* Stack size for tasks */
 #define MAIN_STACK_SIZE 1024
 
+/* Forward declaration: referenced by MQX_template_list below, defined later
+ * in this file. Required by GCC (unlike CodeWarrior, GCC does not allow a
+ * bare identifier to be used as a value without a prior declaration). */
+void main_task(uint32_t param);
+
 /* Global task table */
 const TASK_TEMPLATE_STRUCT MQX_template_list[] = {
     /* Task Index,   Function,   Stack,      Priority,   Name,          Attributes,          Param,  Time Slice */

@@ -1,5 +1,5 @@
-#include <bsp.h>
 #include <mqx.h>
+#include <bsp.h>
 
 #if (MQX_ASSERT == MQX_ASSERT_LOOP || MQX_ASSERT == MQX_ASSERT_BKPT)
 void _mqx_assert(const char *string, const char *func, const char *file,

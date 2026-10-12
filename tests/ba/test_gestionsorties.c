@@ -64,6 +64,10 @@ void vd_PiloterSortie(unsigned char uc_TypeSortie,
 }
 
 void vd_InitMicro(void) {}
+
+/* BA 1.8 : etat de la communication I2C pour la LED (slavenode.c) */
+static unsigned char s_etat_com = 0;
+unsigned char uc_I2C_EtatCom(void) { return s_etat_com; }
 void vd_ConfigBornier(void) {}
 unsigned char uc_EtatEntree(unsigned char n) { (void)n; return 0; }
 void vd_PosSortieBistable_ON(unsigned char n)  { (void)n; }
@@ -160,11 +164,41 @@ void test_initial_led_counter(void) {
     TEST_ASSERT_EQUAL_UINT8(1, uc_CompteurLED);
 }
 
+/* Compte les cycles LED allumee sur n cycles de 40 ms */
+static int led_on_cycles(int n) {
+    int on = 0;
+    for (int k = 0; k < n; k++) {
+        piloter_call_count = 0;
+        vd_PiloterLed();
+        for (int i = 0; i < piloter_call_count; i++) {
+            if (piloter_calls[i].type == uc_SORTIE_LED && piloter_calls[i].etat == uc_ON) on++;
+        }
+    }
+    return on;
+}
+
+/* NR: NR-gcc-12 essensys-hub/essensys-board-SC944D#1
+ * BA 1.8 : LED d'etat -- eclair 1/s si com OK, lent sans activite, rapide en erreur. */
+void test_NR_gcc_12_led_reflects_i2c_state(void) {
+    uc_CompteurLED = 0; s_etat_com = 0;
+    int ok = led_on_cycles(50);          /* 2 s */
+    uc_CompteurLED = 0; s_etat_com = 1;
+    int idle = led_on_cycles(50);
+    uc_CompteurLED = 0; s_etat_com = 2;
+    int err = led_on_cycles(50);
+    s_etat_com = 0;
+    TEST_ASSERT_EQUAL_INT(2 * uc_LED_CADENCEMENT, ok);   /* 2 eclairs de 120 ms */
+    TEST_ASSERT_EQUAL_INT(uc_1s_CADENCEMENT, idle);      /* allumee la moitie du temps */
+    TEST_ASSERT_GREATER_THAN_INT(ok, err);               /* rapide : ~50 %, 8 eclairs */
+    TEST_ASSERT_INT_WITHIN(5, uc_1s_CADENCEMENT, err);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_relay_activation);
     RUN_TEST(test_allume_tout_forces_on);
     RUN_TEST(test_bistable_toggle);
     RUN_TEST(test_initial_led_counter);
+    RUN_TEST(test_NR_gcc_12_led_reflects_i2c_state);
     return UNITY_END();
 }

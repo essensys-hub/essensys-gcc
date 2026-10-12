@@ -13,8 +13,17 @@
 extern  void SSP_Handler(void);
 extern void vd_I2C_Setup(void);
 extern void vd_Traitement_I2C(void);
+extern void vd_SSP_SurveillanceTick(void);
+extern void vd_I2C_PurgerSiLibre(void);
+extern void vd_I2C_SignalerRedemarrage(unsigned char uc_ParChienDeGarde);
 
-__CONFIG(HS & WDTDIS); // CONFIG MICRO : HORLOGE HS / PAS DE WDG (AU DEMARRAGE)
+// BA 1.8 (feature i2c-surge-protection-2026-10-007, Refs
+// essensys-hub/essensys-board-SC944D#1) : chien de garde actif.
+// Periode fixee par WDTCON dans vd_InitMicro (1:16384, ~0,5 s nominal) :
+// un PIC bloque relache SCL en moins de 2 s. Le 1.7 utilisait WDTDIS.
+__CONFIG(HS & WDTEN); // CONFIG MICRO : HORLOGE HS / CHIEN DE GARDE ACTIF
+
+#define STATUS_nTO  0x10    // STATUS<4> : 0 apres un debordement du chien de garde
 
 // ----------------------- VERSION ----------------------
 
@@ -127,6 +136,7 @@ void vd_Lit_Config (void)
             // pour chaque variateur : allumage en cours, allumage sauvegardé, configuration
             for(l_uc_Compteur=0;l_uc_Compteur<uc_VARIATEUR_NB;l_uc_Compteur++)
             {
+                CLRWDT();   // BA 1.8 : ecritures eeprom longues (EEPROM vierge)
                 eeprom_write(address++, 0);
                 eeprom_write(address++, 0);
                 st_Variateurs[l_uc_Compteur].c_Eclairage = 0;
@@ -157,6 +167,7 @@ void vd_Lit_Config (void)
             address = 0x0032;
             for (l_uc_Compteur = 0; l_uc_Compteur < RM_NB; l_uc_Compteur++)
             {
+                CLRWDT();
                 eeprom_write(address++, 0);     // par défaut : pas d'extinction
                 uc_TempsCdeLampe[l_uc_Compteur] = 0;
             }
@@ -198,6 +209,7 @@ void vd_Sauve_Etat (void)
 	// pour chaque variateur : allumage en cours et allumage sauvegardé
 	for(l_uc_Compteur=0;l_uc_Compteur<uc_VARIATEUR_NB;l_uc_Compteur++)
 	{
+            CLRWDT();   // BA 1.8
             eeprom_write(address++, st_Variateurs[l_uc_Compteur].c_Eclairage);
             eeprom_write(address++, st_Variateurs[l_uc_Compteur].c_EclairageOld);
             address++;
@@ -233,6 +245,9 @@ void interrupt IT(void)
 		// Commande en "liaison série" des variateurs
 
 		uc_FlagITTimer = 1;
+
+		// BA 1.8 : timeout du module SSP (50 ms sans activite, ligne basse)
+		vd_SSP_SurveillanceTick();
 		
 		uc_CompteurAcq++;		// acquisition des entrées déplacée dans la tache de fond, pour que le traitement de l'IT soit court
 		//uc_CompteurVar++;
@@ -290,9 +305,15 @@ void interrupt IT(void)
 
 void main(void)
 {
+	unsigned char l_uc_ResetChienDeGarde;
+
+	// BA 1.8 : lu avant toute autre action (CLRWDT remet nTO a 1)
+	l_uc_ResetChienDeGarde = ((STATUS & STATUS_nTO) == 0) ? 1 : 0;
+
 	vd_InitVariables();	// !!! A FAIRE AVANT TOUTE AUTRE FONCTION
 	vd_InitMicro();
         vd_I2C_Setup();
+        vd_I2C_SignalerRedemarrage(l_uc_ResetChienDeGarde);   // BA 1.8 : comm_stat
 	vd_ConfigBornier();	// lit le type de bornier pour initialiser les valeurs max
         vd_Verif_Version();     // vérification version
 	vd_Lit_Config ();	// lecture des paramètres sauvegardés en eeprom
@@ -310,6 +331,9 @@ void main(void)
 
 	while(1)
 	{
+		// BA 1.8 : chien de garde rafraichi a chaque tour de boucle
+		// (une boucle principale figee provoque un redemarrage < 2 s)
+		CLRWDT();
 
 		vd_ConfigBornier();		// confirme le type de bornier
 
@@ -406,6 +430,11 @@ void main(void)
 			vd_AnalyserEntrees();
 			vd_TraitementApplicatif();
                         vd_Traitement_I2C();
+
+                        // BA 1.8 : CmdBuf libere -> accepter de nouveau les trames
+                        GIE = 0;
+                        vd_I2C_PurgerSiLibre();
+                        GIE = 1;
 			vd_PiloterSorties();
 
 			b1_BT_1S = 0;				// flag seconde : à 1 chaque seconde pendant 1 cycle

@@ -39,8 +39,43 @@ void vd_I2C_Setup(void);
 void WriteI2C(char data);
 char ReadI2C(void);
 void SSP_Handler(void);
+void vd_SSP_Reset(void);
+void vd_SSP_SurveillanceTick(void);
+void vd_I2C_PurgerSiLibre(void);
+void vd_I2C_SignalerRedemarrage(unsigned char uc_ParChienDeGarde);
+unsigned char uc_I2C_EtatCom(void);
 
 extern void vd_Sauve_Etat (void);
+
+//--------------------------------------------------------------------
+// BA 1.8 -- feature i2c-surge-protection-2026-10-007
+// (Refs essensys-hub/essensys-board-SC944D#1)
+//
+// - comm_stat : 6e octet de lecture, ignore par un BP 099-37 qui n'en lit
+//   que 5. Signature 0xA0 dans le quartet haut (un BA 1.7 renvoie 0x55 a
+//   cette position), evenements dans le quartet bas, effaces une fois lus.
+// - NACK quand CmdBuf est occupe : SSPBUF n'est pas lu (BF = 1), le module
+//   refuse materiellement les octets suivants (SSPOV) ; la purge a lieu des
+//   que CmdBuf se libere.
+// - Timeout SSP : SDA ou SCL basse, ou SCL retenue (CKP = 0), plus de
+//   50 ms sans activite SSP -> reinitialisation du module.
+//--------------------------------------------------------------------
+#define COMM_STAT_SIG           0xA0
+#define COMM_STAT_RESTART       0x01    // redemarrage depuis la derniere lecture
+#define COMM_STAT_WDT           0x02    // redemarrage par chien de garde
+#define COMM_STAT_SSP_RESET     0x04    // module SSP reinitialise
+#define COMM_STAT_NACK_BUSY     0x08    // commande refusee (tampon occupe)
+
+#define SSP_TIMEOUT_TICKS       120     // 120 x 0,416 ms = 50 ms
+#define SSP_LIGNES_MASQUE       0xC0    // RC6 = SCL, RC7 = SDA
+#define SSP_SSPEN               0x20    // SSPCON<5>
+#define WRITE_I2C_ESSAIS_MAX    8
+
+unsigned char uc_I2C_CommStat;          // evenements a signaler (quartet bas)
+unsigned char uc_I2C_RxBloque;          // 1 = octet laisse dans SSPBUF (NACK)
+unsigned char uc_SSP_TimeoutTicks;      // ticks timer sans activite, ligne basse
+unsigned char uc_SSP_NbReset;           // compteur de reinitialisations SSP
+unsigned char uc_I2C_Erreur;            // derniere trame en erreur (LED)
 
 //--------------------------------------------------------------------
 //Constant Definitions
@@ -137,6 +172,19 @@ unsigned short l_us_CRCRecu;
 
     I2CStat.b = SSPSTAT;
     uc_I2C_activity = 60;           // relance la surveillance d'ativité
+    uc_SSP_TimeoutTicks = 0;        // activite SSP : relance le timeout
+
+    // BA 1.8 : tampon de commande occupe -> octet laisse dans SSPBUF.
+    // Tant que CmdBuf n'est pas libre, le module refuse (NACK) tout octet.
+    if(uc_I2C_RxBloque)
+    {
+        vd_I2C_PurgerSiLibre();
+        return;
+    }
+    if(WCOL)
+    {
+        WCOL = 0;
+    }
 
     //--------------------------------------------------------------------
     // STATE 1: If this is a WRITE operation and last byte was an ADDRESS
@@ -144,6 +192,16 @@ unsigned short l_us_CRCRecu;
 //    if(!D_nA && !R_nW && BF && I2C_START)
     if(!I2CStat.b_stat.D_nA && !I2CStat.b_stat.R_nW && I2CStat.b_stat.BF && I2CStat.b_stat.S)
     {
+        // BA 1.8 : commande precedente pas encore traitee -> refuser la
+        // nouvelle par un NACK plutot que l'accepter puis la perdre.
+        // L'adresse est deja acquittee par le materiel ; SSPBUF reste plein
+        // (BF = 1), les octets suivants recoivent donc un NACK (SSPOV).
+        if (CmdBuf[0] != 0)
+        {
+            uc_I2C_RxBloque = 1;
+            uc_I2C_CommStat |= COMM_STAT_NACK_BUSY;
+            return;
+        }
         // Clear WDT and disable clearing in the main program loop. The
         // WDT will be used to reset the device if an I2C message exceeds
         // the expected amount of time.
@@ -249,6 +307,7 @@ unsigned short l_us_CRCRecu;
                 us_CRC = 0;
                 TxBuf.comm_stat.chkfail = 1;
                 TxBuf.comm_stat.rxerror = 1;
+                uc_I2C_Erreur = 1;
             }
             else
             {
@@ -265,6 +324,7 @@ unsigned short l_us_CRCRecu;
                         CmdBuf[j] = RXBuffer[i];
                     }
                     TxBuf.comm_stat.rxerror = 0;
+                    uc_I2C_Erreur = 0;
                   
                 }
                 else
@@ -339,6 +399,14 @@ unsigned short l_us_CRCRecu;
                 SensBufIndex++;
             break;
 
+            case 4 :
+                // BA 1.8 : 6e octet comm_stat (lu seulement par un BP qui le
+                // demande ; un BP 099-37 arrete la lecture au 5e octet)
+                WriteI2C(COMM_STAT_SIG | (uc_I2C_CommStat & 0x0F));
+                uc_I2C_CommStat = 0;
+                SensBufIndex++;
+            break;
+
             default :
                // Otherwise, just send dummy data back to the master.
                TxBuf.comm_stat.r_w = 1;
@@ -358,7 +426,11 @@ unsigned short l_us_CRCRecu;
         stat.wdtdis = 0;
         CLRWDT();
     }
-    else;
+    else
+    {
+        // BA 1.8 : etat SSP incoherent -> reinitialisation du module
+        vd_SSP_Reset();
+    }
 }
 
 
@@ -367,13 +439,123 @@ unsigned short l_us_CRCRecu;
 //--------------------------------------------------------------------
 void WriteI2C(char data)
 {
+    unsigned char l_uc_Essais = 0;
+
+    // BA 1.8 : boucle bornee (une collision permanente ne doit pas figer
+    // l'interruption ; le timeout SSP prend alors le relais).
     do
     {
         WCOL = 0;
         SSPBUF = data;
-    } while(WCOL);
+        l_uc_Essais++;
+    } while(WCOL && l_uc_Essais < WRITE_I2C_ESSAIS_MAX);
+    WCOL = 0;
     // Release the clock.
     CKP = 1;
+}
+
+//--------------------------------------------------------------------
+// void vd_SSP_Reset(void)
+//
+// BA 1.8 : sortie de l'etat d'erreur du module SSP sans coupure
+// d'alimentation : SSPEN a 0 puis a 1 (relache SDA et SCL), CKP a 1,
+// purge de SSPOV et WCOL, remise a zero de l'automate esclave.
+//--------------------------------------------------------------------
+void vd_SSP_Reset(void)
+{
+    unsigned char l_uc_Dummy;
+
+    SSPCON &= ~SSP_SSPEN;
+    l_uc_Dummy = SSPBUF;            // vide BF
+    (void)l_uc_Dummy;
+    SSPOV = 0;
+    WCOL = 0;
+    SSPCON |= SSP_SSPEN;
+    CKP = 1;
+    RXBufferIndex = 0;
+    SensBufIndex = 0;
+    uc_I2C_RxBloque = 0;
+    uc_SSP_TimeoutTicks = 0;
+    stat.wdtdis = 0;
+    uc_I2C_CommStat |= COMM_STAT_SSP_RESET;
+    if (uc_SSP_NbReset < 255) uc_SSP_NbReset++;
+}
+
+//--------------------------------------------------------------------
+// void vd_SSP_SurveillanceTick(void)
+//
+// BA 1.8 : appele par l'IT timer (toutes les 0,416 ms). Si SDA ou SCL est
+// basse, ou si le BA retient SCL (CKP = 0), sans aucune activite SSP
+// pendant 50 ms, le module SSP est reinitialise.
+//--------------------------------------------------------------------
+void vd_SSP_SurveillanceTick(void)
+{
+    if (((PORTC & SSP_LIGNES_MASQUE) != SSP_LIGNES_MASQUE) || (CKP == 0))
+    {
+        if (uc_SSP_TimeoutTicks < SSP_TIMEOUT_TICKS)
+        {
+            uc_SSP_TimeoutTicks++;
+        }
+        else
+        {
+            vd_SSP_Reset();
+        }
+    }
+    else
+    {
+        uc_SSP_TimeoutTicks = 0;
+    }
+}
+
+//--------------------------------------------------------------------
+// void vd_I2C_PurgerSiLibre(void)
+//
+// BA 1.8 : apres un refus (NACK), des que CmdBuf est libre, vide SSPBUF
+// et SSPOV pour accepter de nouveau les trames. A appeler avec les IT
+// masquees hors interruption.
+//--------------------------------------------------------------------
+void vd_I2C_PurgerSiLibre(void)
+{
+    unsigned char l_uc_Dummy;
+
+    if (uc_I2C_RxBloque && CmdBuf[0] == 0)
+    {
+        l_uc_Dummy = SSPBUF;
+        (void)l_uc_Dummy;
+        SSPOV = 0;
+        CKP = 1;
+        RXBufferIndex = 0;
+        uc_I2C_RxBloque = 0;
+    }
+}
+
+//--------------------------------------------------------------------
+// BA 1.8 : redemarrage signale au BP dans comm_stat (6e octet).
+//--------------------------------------------------------------------
+void vd_I2C_SignalerRedemarrage(unsigned char uc_ParChienDeGarde)
+{
+    uc_I2C_CommStat |= COMM_STAT_RESTART;
+    if (uc_ParChienDeGarde)
+    {
+        uc_I2C_CommStat |= COMM_STAT_WDT;
+    }
+}
+
+//--------------------------------------------------------------------
+// BA 1.8 : etat de la communication pour la LED d'etat
+//   0 = OK, 1 = pas d'activite depuis 60 s, 2 = erreur de trame / NACK
+//--------------------------------------------------------------------
+unsigned char uc_I2C_EtatCom(void)
+{
+    if (TxBuf.comm_stat.noactivity)
+    {
+        return 1;
+    }
+    if (uc_I2C_Erreur || uc_I2C_RxBloque)
+    {
+        return 2;
+    }
+    return 0;
 }
 
 
@@ -419,6 +601,11 @@ void vd_I2C_Setup(void)
     //xxxTXChecksum = 0;
     //xxxRXChecksum = 0;
     CmdBuf[0] = 0;
+    uc_I2C_RxBloque = 0;
+    uc_SSP_TimeoutTicks = 0;
+    uc_I2C_Erreur = 0;
+    // BA 1.8 : tout demarrage est signale au BP (resynchronisation)
+    uc_I2C_CommStat = COMM_STAT_RESTART;
 }
 
 //--------------------------------------------------------------------

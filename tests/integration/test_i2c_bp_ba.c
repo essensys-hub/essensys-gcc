@@ -96,6 +96,15 @@ extern union TXBUF {
 
 extern char CmdBuf[];
 
+/* BA 1.8 (feature i2c-surge-protection-2026-10-007) */
+extern void vd_SSP_SurveillanceTick(void);
+extern void vd_I2C_PurgerSiLibre(void);
+extern void vd_I2C_SignalerRedemarrage(unsigned char);
+extern unsigned char uc_I2C_EtatCom(void);
+extern unsigned char uc_I2C_CommStat;
+extern unsigned char uc_I2C_RxBloque;
+extern unsigned char uc_SSP_NbReset;
+
 /* ================================================================
  * I2C bus simulation helpers
  *
@@ -172,6 +181,163 @@ void setUp(void) {
     SSPOV = 0;
     WCOL = 0;
     CKP = 0;
+    SSPCON = 0x36;
+    PORTC = 0xC0;     /* SCL et SDA hautes */
+    uc_SSP_NbReset = 0;
+}
+
+/* Lecture de n octets de reponse (le BP 1.8 en lit 6, 099-37 en lit 5) */
+static void sim_read_n(unsigned char *resp, int n) {
+    resp[0] = sim_i2c_read_addr();
+    for (int i = 1; i < n; i++)
+        resp[i] = sim_i2c_read_data();
+}
+
+/* NR: NR-gcc-13 essensys-hub/essensys-board-SC944D#1
+ * BA 1.8 : 6e octet comm_stat (signature 0xA0) avec drapeau de redemarrage,
+ * efface une fois lu ; les 5 premiers octets sont inchanges (BP 099-37). */
+void test_NR_gcc_13_comm_stat_sixth_byte(void) {
+    unsigned char payload[] = {0x05, 0x01};
+    unsigned char r5[5], r6[7];
+
+    /* BP 099-37 : lit 5 octets, le drapeau reste en attente */
+    sim_send_frame(0x12, payload, 2);
+    sim_read_n(r5, 5);
+    TEST_ASSERT_EQUAL_UINT8(0x05, r5[0]);
+    unsigned short crc = us_CalculerCRCSurTrame(r5, 3);
+    TEST_ASSERT_EQUAL_UINT8(crc & 0xFF, r5[3]);
+    TEST_ASSERT_EQUAL_UINT8((crc >> 8) & 0xFF, r5[4]);
+    TEST_ASSERT_EQUAL_HEX8(0x01, uc_I2C_CommStat & 0x01);
+
+    /* BP modifie : lit 6 octets */
+    CmdBuf[0] = 0;
+    sim_send_frame(0x12, payload, 2);
+    sim_read_n(r6, 7);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(r5, r6, 5);         /* memes 5 octets */
+    TEST_ASSERT_EQUAL_HEX8(0xA1, r6[5]);              /* signature + redemarrage */
+    TEST_ASSERT_EQUAL_HEX8(0x55, r6[6]);              /* au-dela : octet neutre */
+
+    CmdBuf[0] = 0;
+    sim_send_frame(0x12, payload, 2);
+    sim_read_n(r6, 6);
+    TEST_ASSERT_EQUAL_HEX8(0xA0, r6[5]);              /* drapeau efface */
+
+    /* redemarrage par chien de garde */
+    vd_I2C_SignalerRedemarrage(1);
+    CmdBuf[0] = 0;
+    sim_send_frame(0x12, payload, 2);
+    sim_read_n(r6, 6);
+    TEST_ASSERT_EQUAL_HEX8(0xA3, r6[5]);
+}
+
+/* NR: NR-gcc-14 essensys-hub/essensys-board-SC944D#1
+ * BA 1.8 : tampon de commande occupe -> la nouvelle trame est refusee
+ * (SSPBUF laisse plein, NACK materiel), jamais acceptee puis perdue ; une
+ * fois CmdBuf libre, la purge rouvre la reception et la retransmission
+ * est appliquee. */
+void test_NR_gcc_14_nack_when_cmdbuf_busy(void) {
+    unsigned char first[] = {0x05, 0x01};
+    unsigned char second[] = {0x05, 0x02};
+
+    sim_send_frame(0x12, first, 2);
+    TEST_ASSERT_EQUAL(5, CmdBuf[0]);
+    TEST_ASSERT_EQUAL(1, CmdBuf[1]);
+
+    /* deuxieme trame pendant que CmdBuf est occupe */
+    SSPBUF = 0x24;            /* adresse 0x12 << 1 */
+    SSPOV = 0;
+    SSPSTAT = SSP_WRITE_ADDR;
+    SSP_Handler();
+    TEST_ASSERT_EQUAL_UINT8(1, uc_I2C_RxBloque);
+    TEST_ASSERT_EQUAL_HEX8(0x24, SSPBUF);             /* non lu : BF reste a 1 */
+    /* le module refuse les octets suivants (SSPOV) : rien n'est consomme */
+    SSPOV = 1;
+    SSPSTAT = SSP_WRITE_DATA;
+    SSP_Handler();
+    TEST_ASSERT_EQUAL(1, CmdBuf[1]);                  /* premiere trame intacte */
+    TEST_ASSERT_EQUAL_UINT8(1, SSPOV);
+    TEST_ASSERT_EQUAL_UINT8(2, uc_I2C_EtatCom());
+    TEST_ASSERT_EQUAL_HEX8(0x08, uc_I2C_CommStat & 0x08);
+
+    /* purge refusee tant que CmdBuf n'est pas traite */
+    vd_I2C_PurgerSiLibre();
+    TEST_ASSERT_EQUAL_UINT8(1, uc_I2C_RxBloque);
+
+    /* traitement de la premiere commande puis purge */
+    CmdBuf[0] = 0;
+    vd_I2C_PurgerSiLibre();
+    TEST_ASSERT_EQUAL_UINT8(0, uc_I2C_RxBloque);
+    TEST_ASSERT_EQUAL_UINT8(0, SSPOV);
+
+    /* retransmission par le BP : appliquee */
+    sim_send_frame(0x12, second, 2);
+    TEST_ASSERT_EQUAL(5, CmdBuf[0]);
+    TEST_ASSERT_EQUAL(2, CmdBuf[1]);
+    TEST_ASSERT_EQUAL_UINT(0, TxBuf.comm_stat.rxerror);
+}
+
+/* NR: NR-gcc-15 essensys-hub/essensys-board-SC944D#1
+ * BA 1.8 : timeout SSP -- ligne basse ou SCL retenue plus de 50 ms sans
+ * activite : module SSP reinitialise (SSPEN 0 -> 1, CKP = 1, SSPOV/WCOL
+ * purges), sans coupure d'alimentation. */
+void test_NR_gcc_15_ssp_timeout_resets_module(void) {
+    int i;
+
+    /* SDA retenue basse, module fige */
+    PORTC = 0x40;
+    CKP = 1;
+    SSPOV = 1; WCOL = 1;
+    for (i = 0; i < 120; i++) vd_SSP_SurveillanceTick();   /* 49,9 ms */
+    TEST_ASSERT_EQUAL_UINT8(0, uc_SSP_NbReset);
+    vd_SSP_SurveillanceTick();                              /* 50,3 ms */
+    TEST_ASSERT_EQUAL_UINT8(1, uc_SSP_NbReset);
+    TEST_ASSERT_EQUAL_HEX8(0x20, SSPCON & 0x20);            /* SSPEN remis a 1 */
+    TEST_ASSERT_EQUAL_UINT8(1, CKP);
+    TEST_ASSERT_EQUAL_UINT8(0, SSPOV);
+    TEST_ASSERT_EQUAL_UINT8(0, WCOL);
+    TEST_ASSERT_EQUAL_HEX8(0x04, uc_I2C_CommStat & 0x04);
+
+    /* SCL retenue par le BA (CKP = 0), lignes hautes */
+    PORTC = 0xC0;
+    CKP = 0;
+    for (i = 0; i < 121; i++) vd_SSP_SurveillanceTick();
+    TEST_ASSERT_EQUAL_UINT8(2, uc_SSP_NbReset);
+    TEST_ASSERT_EQUAL_UINT8(1, CKP);
+
+    /* activite SSP reguliere : jamais de reinitialisation */
+    PORTC = 0x40;
+    for (i = 0; i < 1000; i++) {
+        vd_SSP_SurveillanceTick();
+        if ((i % 100) == 0) sim_i2c_write_addr(0x24);       /* activite SSP adressee a ce BA (toutes les 42 ms) */
+    }
+    TEST_ASSERT_EQUAL_UINT8(2, uc_SSP_NbReset);
+
+    /* bus libre : rien */
+    PORTC = 0xC0; CKP = 1;
+    for (i = 0; i < 1000; i++) vd_SSP_SurveillanceTick();
+    TEST_ASSERT_EQUAL_UINT8(2, uc_SSP_NbReset);
+}
+
+/* NR: NR-gcc-15 essensys-hub/essensys-board-SC944D#1
+ * BA 1.8 : debordement SSP pendant une trame : signale, puis la trame
+ * suivante est acquittee sans cycle d'alimentation ; un etat SSP
+ * incoherent reinitialise le module. */
+void test_NR_gcc_15_ssp_overflow_then_next_frame_ok(void) {
+    unsigned char payload[] = {0x05, 0x01};
+
+    SSPBUF = 0x24; SSPOV = 1; SSPSTAT = SSP_WRITE_ADDR;
+    SSP_Handler();
+    TEST_ASSERT_EQUAL_UINT(1, TxBuf.comm_stat.sspov);
+    TEST_ASSERT_EQUAL_UINT8(0, SSPOV);
+
+    sim_send_frame(0x12, payload, 2);
+    TEST_ASSERT_EQUAL(5, CmdBuf[0]);
+    TEST_ASSERT_EQUAL_UINT(0, TxBuf.comm_stat.rxerror);
+
+    /* etat incoherent : D_nA=1, R_nW=1, BF=1 */
+    SSPSTAT = 0x25;
+    SSP_Handler();
+    TEST_ASSERT_EQUAL_UINT8(1, uc_SSP_NbReset);
 }
 
 void tearDown(void) {}
@@ -223,5 +389,9 @@ int main(void) {
     RUN_TEST(test_i2c_valid_crc);
     RUN_TEST(test_i2c_invalid_crc);
     RUN_TEST(test_i2c_unknown_command);
+    RUN_TEST(test_NR_gcc_13_comm_stat_sixth_byte);
+    RUN_TEST(test_NR_gcc_14_nack_when_cmdbuf_busy);
+    RUN_TEST(test_NR_gcc_15_ssp_timeout_resets_module);
+    RUN_TEST(test_NR_gcc_15_ssp_overflow_then_next_frame_ok);
     return UNITY_END();
 }

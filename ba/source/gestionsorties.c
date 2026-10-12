@@ -11,15 +11,41 @@
 #include "hard.h"
 
 
+// BA 1.8 : etat de la communication I2C (0 OK, 1 pas d'activite, 2 erreur)
+extern unsigned char uc_I2C_EtatCom(void);
+
 // Fait flasher la led d'état périodiquement
+// BA 1.8 (feature i2c-surge-protection-2026-10-007) : LED d'etat
+//   com OK            : un eclair de 120 ms par seconde (comportement 1.7)
+//   aucune activite   : clignotement lent (1 s allumee, 1 s eteinte)
+//   erreur / NACK     : clignotement rapide (120 ms / 120 ms)
 void vd_PiloterLed(void)
 {
-	if(uc_CompteurLED < uc_LED_CADENCEMENT)
+	unsigned char l_uc_Allume;
+	unsigned char l_uc_Periode;
+
+	switch (uc_I2C_EtatCom())
+	{
+		case 1 :
+			l_uc_Allume = uc_1s_CADENCEMENT;
+			l_uc_Periode = uc_1s_CADENCEMENT << 1;
+		break;
+		case 2 :
+			l_uc_Allume = uc_LED_CADENCEMENT;
+			l_uc_Periode = uc_LED_CADENCEMENT << 1;
+		break;
+		default :
+			l_uc_Allume = uc_LED_CADENCEMENT;
+			l_uc_Periode = uc_1s_CADENCEMENT;
+		break;
+	}
+
+	if(uc_CompteurLED < l_uc_Allume)
 	{
 		vd_PiloterSortie(uc_SORTIE_LED,0,uc_ON);
 		uc_CompteurLED++;
 	}
-	else if(uc_CompteurLED < uc_1s_CADENCEMENT)
+	else if(uc_CompteurLED < l_uc_Periode)
 	{
 		vd_PiloterSortie(uc_SORTIE_LED,0,uc_OFF);
 		uc_CompteurLED++;

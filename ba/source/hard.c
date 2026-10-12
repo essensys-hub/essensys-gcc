@@ -42,6 +42,13 @@ void vd_InitMicro(void)
 	OPTION_REG&=~0x02;							// PS1 :
 	OPTION_REG|=0x01;							// PS0 :
 */
+	// BA 1.8 (feature i2c-surge-protection-2026-10-007) : chien de garde.
+	// Le prescaler d'OPTION_REG reste affecte au timer 0 (PSA = 0) ; la
+	// periode du chien de garde vient de WDTCON : WDTPS = 1001 -> 1:16384,
+	// soit ~0,5 s nominal sur LFINTOSC 31 kHz, < 2 s dans le pire cas.
+	WDTCON = 0x12;
+	CLRWDT();
+
 	TMR0=uc_TIMER_416_US;						// timer initialisé
 	T0IF = 0;									// raz bit d'IT avant autorisation de l'IT
 	T0IE = 1;									// autorise IT timer 0

@@ -1,5 +1,5 @@
 CC       = cc
-CFLAGS   = -Wall -Wextra -g -DUNIT_TEST -DBOARD_TYPE=0x12 -funsigned-char \
+CFLAGS   = -Wall -Wextra -g -DUNIT_TEST -DTYPE_CHAMBRES -funsigned-char \
            -I ../../ba/source -I ../stubs -I ../unity/src
 UNITY    = ../unity/src/unity.c
 BA_SRC   = ../../ba/source

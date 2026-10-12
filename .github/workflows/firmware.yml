@@ -26,6 +26,16 @@ jobs:
       - name: Tests integration
         run: make -C tests/integration run_tests
 
+      # Feature i2c-surge-protection-2026-10-007 (NR-gcc-*, Refs essensys-hub/essensys-board-SC944D#1)
+      - name: Tests pilote I2C borne + recuperation (bus simule)
+        run: make -C tests/i2c run_tests
+
+      - name: Tests resilience BP <-> BA (horloge simulee)
+        run: make -C tests/resil run_tests
+
+      - name: Verification des cibles BA (une macro TYPE_* par carte)
+        run: tests/ba/check_board_types.sh
+
   # Job 2 : Build BP (Docker + m68k-elf-gcc, sans XC8)
   build-bp:
     name: Build BP (SC944D)

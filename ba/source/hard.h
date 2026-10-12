@@ -8,24 +8,28 @@ extern void vd_PosSortieBistable_ON(unsigned char uc_NumeroSortie);
 extern void vd_PosSortieBistable_OFF(unsigned char uc_NumeroSortie);
 extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char uc_Etat);
 
-#ifndef BOARD_TYPE
-  #error "BOARD_TYPE must be defined via -DBOARD_TYPE=TYPE_xxx"
+// essensys-gcc (feature i2c-surge-protection-2026-10-007, tache 5.10) :
+// le type de boitier est fixe par la cible de build, avec UNE SEULE macro :
+//   -DTYPE_PIECES_DE_VIE  SC940D, adresse 0x11
+//   -DTYPE_CHAMBRES       SC942C, adresse 0x12
+//   -DTYPE_PIECES_D_EAU   SC941C, adresse 0x13
+// (TYPE_PIECES_DE_VIE_PROTO : SC940-0A proto, hors production). Le build
+// precedent definissait les trois macros ensemble, si bien que tout
+// "#ifdef TYPE_xxx" etait vrai pour toutes les cartes.
+#if (defined(TYPE_PIECES_DE_VIE) + defined(TYPE_PIECES_D_EAU) + defined(TYPE_CHAMBRES) + defined(TYPE_PIECES_DE_VIE_PROTO)) != 1
+#error "Definir exactement une macro TYPE_PIECES_DE_VIE, TYPE_CHAMBRES ou TYPE_PIECES_D_EAU (voir ba/Makefile)"
 #endif
-#define TYPE_PIECES_DE_VIE  0x11
-#define TYPE_PIECES_D_EAU   0x13
-#define TYPE_CHAMBRES       0x12
-#define TYPE_BOARD  BOARD_TYPE
 
-#if TYPE_BOARD == TYPE_CHAMBRES
+#ifdef TYPE_CHAMBRES
 
 // boitier auxiliaire "Chambres"
 
 // adresse I2C
-            //      0x11	// boitier piï¿½ces de vie
+            //      0x11	// boitier pièces de vie
 #define I2C_ADDR    0x12	// boitier chambres
-            //      0x13	// boitier piï¿½ces d'eau
+            //      0x13	// boitier pièces d'eau
 
-// Entrï¿½es de la carte "Chambres"
+// Entrées de la carte "Chambres"
 #define ENTREE0_INIT		TRISB |= 0x01;
 #define ENTREE0_ETAT		(PORTB & 0x01)
 
@@ -89,8 +93,8 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 #define ENTREE20_INIT		TRISC |= 0x02;
 #define ENTREE20_ETAT		(PORTC & 0x02)
 
-#define ENTREE21_INIT		TRISA |= 0x02;	// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define ENTREE21_ETAT		(PORTA & 0x02)	// non utilisï¿½ : sur pin non cï¿½blï¿½e
+#define ENTREE21_INIT		TRISA |= 0x02;	// non utilisé : sur pin non câblée
+#define ENTREE21_ETAT		(PORTA & 0x02)	// non utilisé : sur pin non câblée
 
 // Sorties de la carte "Chambres"
 #define RM0_INIT	TRISB &= ~0x08;
@@ -121,33 +125,33 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 #define RM6_OFF		s_uc_PortE &= ~0x40
 #define RM6_ON		s_uc_PortE |= 0x40
 
-#define RM7_INIT	;			// non utilisï¿½ : pas d'action
-#define RM7_OFF                 		// non utilisï¿½ : pas d'action
-#define RM7_ON                  		// non utilisï¿½ : pas d'action
+#define RM7_INIT	;			// non utilisé : pas d'action
+#define RM7_OFF                 		// non utilisé : pas d'action
+#define RM7_ON                  		// non utilisé : pas d'action
 
-#define RM8_INIT	;			// non utilisï¿½ : pas d'action
-#define RM8_OFF                 		// non utilisï¿½ : pas d'action
-#define RM8_ON                  		// non utilisï¿½ : pas d'action
+#define RM8_INIT	;			// non utilisé : pas d'action
+#define RM8_OFF                 		// non utilisé : pas d'action
+#define RM8_ON                  		// non utilisé : pas d'action
 
-#define RM9_INIT	;			// non utilisï¿½ : pas d'action
-#define RM9_OFF                 		// non utilisï¿½ : pas d'action
-#define RM9_ON                  		// non utilisï¿½ : pas d'action
+#define RM9_INIT	;			// non utilisé : pas d'action
+#define RM9_OFF                 		// non utilisé : pas d'action
+#define RM9_ON                  		// non utilisé : pas d'action
 
-#define RM10_INIT	;			// non utilisï¿½ : pas d'action
-#define RM10_OFF                 		// non utilisï¿½ : pas d'action
-#define RM10_ON                  		// non utilisï¿½ : pas d'action
+#define RM10_INIT	;			// non utilisé : pas d'action
+#define RM10_OFF                 		// non utilisé : pas d'action
+#define RM10_ON                  		// non utilisé : pas d'action
 
-#define RM11_INIT	;			// non utilisï¿½ : pas d'action
-#define RM11_OFF                 		// non utilisï¿½ : pas d'action
-#define RM11_ON                  		// non utilisï¿½ : pas d'action
+#define RM11_INIT	;			// non utilisé : pas d'action
+#define RM11_OFF                 		// non utilisé : pas d'action
+#define RM11_ON                  		// non utilisé : pas d'action
 
-#define RM12_INIT	;			// non utilisï¿½ : pas d'action
-#define RM12_OFF                 		// non utilisï¿½ : pas d'action
-#define RM12_ON                  		// non utilisï¿½ : pas d'action
+#define RM12_INIT	;			// non utilisé : pas d'action
+#define RM12_OFF                 		// non utilisé : pas d'action
+#define RM12_ON                  		// non utilisé : pas d'action
 
 
-// #define PWM_INIT_IN	TRISD |= 0x04;		// sera basculï¿½ en sortie ï¿½ la fin du 1er cycle
-#define PWM_INIT_OUT   	TRISD &= ~0x04;		// sera basculï¿½ en sortie ï¿½ la fin du 1er cycle
+// #define PWM_INIT_IN	TRISD |= 0x04;		// sera basculé en sortie à la fin du 1er cycle
+#define PWM_INIT_OUT   	TRISD &= ~0x04;		// sera basculé en sortie à la fin du 1er cycle
 #define RBSENS1_INIT	TRISD |= 0x04;
 #define RBSENS1_OFF
 #define RBSENS1_ON
@@ -196,13 +200,13 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 #define RB9_OFF		s_uc_PortF &= ~0x40
 #define RB9_ON		s_uc_PortF |= 0x40
 
-#define RB10_INIT	;			// non utilisï¿½ : pas d'action
-#define RB10_OFF				// non utilisï¿½ : pas d'action
-#define RB10_ON					// non utilisï¿½ : pas d'action
+#define RB10_INIT	;			// non utilisé : pas d'action
+#define RB10_OFF				// non utilisé : pas d'action
+#define RB10_ON					// non utilisé : pas d'action
 
-#define RB11_INIT	;			// non utilisï¿½ : pas d'action
-#define RB11_OFF				// non utilisï¿½ : pas d'action
-#define RB11_ON					// non utilisï¿½ : pas d'action
+#define RB11_INIT	;			// non utilisé : pas d'action
+#define RB11_OFF				// non utilisé : pas d'action
+#define RB11_ON					// non utilisé : pas d'action
 
 
 #define VARIATEUR0_INIT	TRISB &= ~0x02;
@@ -227,17 +231,17 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 
 #endif
 
-#if TYPE_BOARD == TYPE_PIECES_D_EAU
+#ifdef TYPE_PIECES_D_EAU
 
-// boitier auxiliaire "Piï¿½ces d'eau"
+// boitier auxiliaire "Pièces d'eau"
 
 // adresse I2C
-            //      0x11	// boitier piï¿½ces de vie
+            //      0x11	// boitier pièces de vie
             //      0x12	// boitier chambres
-#define I2C_ADDR    0x13	// boitier piï¿½ces d'eau
-// xxx #define I2C_ADDR    0x62	// boitier piï¿½ces d'eau
+#define I2C_ADDR    0x13	// boitier pièces d'eau
+// xxx #define I2C_ADDR    0x62	// boitier pièces d'eau
 
-// Entrï¿½es de la carte "Piï¿½ces d'eau"
+// Entrées de la carte "Pièces d'eau"
 #define ENTREE0_INIT		TRISB |= 0x01;
 #define ENTREE0_ETAT		(PORTB & 0x01)
 
@@ -305,7 +309,7 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 #define ENTREE21_ETAT		(PORTC & 0x01)
 
 
-// Sorties de la carte "Piï¿½ces d'eau"
+// Sorties de la carte "Pièces d'eau"
 #define RM0_INIT	TRISB &= ~0x02;
 #define RM0_OFF		s_uc_PortB &= ~0x02
 #define RM0_ON		s_uc_PortB |= 0x02
@@ -359,8 +363,8 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 #define RM12_ON		s_uc_PortA |= 0x01
 
 
-// #define PWM_INIT_IN	TRISD |= 0x04;		// sera basculï¿½ en sortie ï¿½ la fin du 1er cycle
-#define PWM_INIT_OUT   	TRISD &= ~0x04;		// sera basculï¿½ en sortie ï¿½ la fin du 1er cycle
+// #define PWM_INIT_IN	TRISD |= 0x04;		// sera basculé en sortie à la fin du 1er cycle
+#define PWM_INIT_OUT   	TRISD &= ~0x04;		// sera basculé en sortie à la fin du 1er cycle
 #define RBSENS1_INIT	TRISD |= 0x04;
 #define RBSENS1_OFF
 #define RBSENS1_ON
@@ -401,38 +405,38 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 #define RB7_OFF		s_uc_PortE &= ~0x40
 #define RB7_ON		s_uc_PortE |= 0x40
 
-#define RB8_INIT	;			// non utilisï¿½ : pas d'action
-#define RB8_OFF					// non utilisï¿½ : pas d'action
-#define RB8_ON					// non utilisï¿½ : pas d'action
+#define RB8_INIT	;			// non utilisé : pas d'action
+#define RB8_OFF					// non utilisé : pas d'action
+#define RB8_ON					// non utilisé : pas d'action
 
-#define RB9_INIT	;			// non utilisï¿½ : pas d'action
-#define RB9_OFF					// non utilisï¿½ : pas d'action
-#define RB9_ON					// non utilisï¿½ : pas d'action
+#define RB9_INIT	;			// non utilisé : pas d'action
+#define RB9_OFF					// non utilisé : pas d'action
+#define RB9_ON					// non utilisé : pas d'action
 
-#define RB10_INIT	;			// non utilisï¿½ : pas d'action
-#define RB10_OFF				// non utilisï¿½ : pas d'action
-#define RB10_ON					// non utilisï¿½ : pas d'action
+#define RB10_INIT	;			// non utilisé : pas d'action
+#define RB10_OFF				// non utilisé : pas d'action
+#define RB10_ON					// non utilisé : pas d'action
 
-#define RB11_INIT	;			// non utilisï¿½ : pas d'action
-#define RB11_OFF				// non utilisï¿½ : pas d'action
-#define RB11_ON					// non utilisï¿½ : pas d'action
+#define RB11_INIT	;			// non utilisé : pas d'action
+#define RB11_OFF				// non utilisé : pas d'action
+#define RB11_ON					// non utilisé : pas d'action
 
 
 #define VARIATEUR0_INIT	TRISE &= ~0x01;
 #define VARIATEUR0_OFF	s_uc_PortE &= ~0x01
 #define VARIATEUR0_ON	s_uc_PortE |= 0x01
 
-#define VARIATEUR1_INIT	;			// non utilisï¿½ : pas d'action
-#define VARIATEUR1_OFF				// non utilisï¿½ : pas d'action
-#define VARIATEUR1_ON				// non utilisï¿½ : pas d'action
+#define VARIATEUR1_INIT	;			// non utilisé : pas d'action
+#define VARIATEUR1_OFF				// non utilisé : pas d'action
+#define VARIATEUR1_ON				// non utilisé : pas d'action
 
-#define VARIATEUR2_INIT	;			// non utilisï¿½ : pas d'action
-#define VARIATEUR2_OFF				// non utilisï¿½ : pas d'action
-#define VARIATEUR2_ON				// non utilisï¿½ : pas d'action
+#define VARIATEUR2_INIT	;			// non utilisé : pas d'action
+#define VARIATEUR2_OFF				// non utilisé : pas d'action
+#define VARIATEUR2_ON				// non utilisé : pas d'action
 
-#define VARIATEUR3_INIT ;			// non utilisï¿½ : pas d'action
-#define VARIATEUR3_OFF				// non utilisï¿½ : pas d'action
-#define VARIATEUR3_ON				// non utilisï¿½ : pas d'action
+#define VARIATEUR3_INIT ;			// non utilisé : pas d'action
+#define VARIATEUR3_OFF				// non utilisé : pas d'action
+#define VARIATEUR3_ON				// non utilisé : pas d'action
 
 #define LED_INIT	TRISD &= ~0x08;
 #define LED_OFF		s_uc_PortD &= ~0x08
@@ -440,19 +444,19 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 
 #endif
 
-#if TYPE_BOARD == TYPE_PIECES_DE_VIE
+#ifdef TYPE_PIECES_DE_VIE
 
-// boitier auxiliaire "Piï¿½ces de vie"
+// boitier auxiliaire "Pièces de vie"
 
 // adresse I2C
-#define I2C_ADDR    0x11	// boitier piï¿½ces de vie
+#define I2C_ADDR    0x11	// boitier pièces de vie
             //      0x12	// boitier chambres
-            //      0x13	// boitier piï¿½ces d'eau
+            //      0x13	// boitier pièces d'eau
 
 // n'existe plus #define ENTREE_CONF_INIT	TRISB |= 0x0C;
 // n'existe plus #define ENTREE_CONF_ETAT	(PORTB & 0x0C) >> 2
 
-// Entrï¿½es de la carte "Piï¿½ces de vie"
+// Entrées de la carte "Pièces de vie"
 #define ENTREE0_INIT		TRISB |= 0x01;
 #define ENTREE0_ETAT		(PORTB & 0x01)
 
@@ -513,14 +517,14 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 #define ENTREE19_INIT		TRISC |= 0x04;
 #define ENTREE19_ETAT		(PORTC & 0x04)
 
-#define ENTREE20_INIT		TRISB |= 0x02;	// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define ENTREE20_ETAT		(PORTB & 0x02)	// non utilisï¿½ : sur pin non cï¿½blï¿½e
+#define ENTREE20_INIT		TRISB |= 0x02;	// non utilisé : sur pin non câblée
+#define ENTREE20_ETAT		(PORTB & 0x02)	// non utilisé : sur pin non câblée
 
-#define ENTREE21_INIT		TRISB |= 0x02;	// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define ENTREE21_ETAT		(PORTB & 0x02)	// non utilisï¿½ : sur pin non cï¿½blï¿½e
+#define ENTREE21_INIT		TRISB |= 0x02;	// non utilisé : sur pin non câblée
+#define ENTREE21_ETAT		(PORTB & 0x02)	// non utilisé : sur pin non câblée
 
 
-// Sorties de la carte "Piï¿½ces de vie"
+// Sorties de la carte "Pièces de vie"
 #define RM0_INIT	TRISA &= ~0x01;
 #define RM0_OFF		s_uc_PortA &= ~0x01
 #define RM0_ON		s_uc_PortA |= 0x01
@@ -541,41 +545,41 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 #define RM4_OFF		s_uc_PortE &= ~0x40
 #define RM4_ON		s_uc_PortE |= 0x40
 
-#define RM5_INIT	TRISB &= ~0x04;			// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM5_OFF		s_uc_PortB &= ~0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM5_ON		s_uc_PortB |= 0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
+#define RM5_INIT	TRISB &= ~0x04;			// non utilisé : sur pin non câblée
+#define RM5_OFF		s_uc_PortB &= ~0x04		// non utilisé : sur pin non câblée
+#define RM5_ON		s_uc_PortB |= 0x04		// non utilisé : sur pin non câblée
 
-#define RM6_INIT	TRISB &= ~0x04;			// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM6_OFF		s_uc_PortB &= ~0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM6_ON		s_uc_PortB |= 0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
+#define RM6_INIT	TRISB &= ~0x04;			// non utilisé : sur pin non câblée
+#define RM6_OFF		s_uc_PortB &= ~0x04		// non utilisé : sur pin non câblée
+#define RM6_ON		s_uc_PortB |= 0x04		// non utilisé : sur pin non câblée
 
-#define RM7_INIT	TRISB &= ~0x04;			// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM7_OFF		s_uc_PortB &= ~0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM7_ON		s_uc_PortB |= 0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
+#define RM7_INIT	TRISB &= ~0x04;			// non utilisé : sur pin non câblée
+#define RM7_OFF		s_uc_PortB &= ~0x04		// non utilisé : sur pin non câblée
+#define RM7_ON		s_uc_PortB |= 0x04		// non utilisé : sur pin non câblée
 
-#define RM8_INIT	TRISB &= ~0x04;			// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM8_OFF		s_uc_PortB &= ~0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM8_ON		s_uc_PortB |= 0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
+#define RM8_INIT	TRISB &= ~0x04;			// non utilisé : sur pin non câblée
+#define RM8_OFF		s_uc_PortB &= ~0x04		// non utilisé : sur pin non câblée
+#define RM8_ON		s_uc_PortB |= 0x04		// non utilisé : sur pin non câblée
 
-#define RM9_INIT	TRISB &= ~0x04;			// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM9_OFF		s_uc_PortB &= ~0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM9_ON		s_uc_PortB |= 0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
+#define RM9_INIT	TRISB &= ~0x04;			// non utilisé : sur pin non câblée
+#define RM9_OFF		s_uc_PortB &= ~0x04		// non utilisé : sur pin non câblée
+#define RM9_ON		s_uc_PortB |= 0x04		// non utilisé : sur pin non câblée
 
-#define RM10_INIT	TRISB &= ~0x04;			// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM10_OFF	s_uc_PortB &= ~0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM10_ON		s_uc_PortB |= 0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
+#define RM10_INIT	TRISB &= ~0x04;			// non utilisé : sur pin non câblée
+#define RM10_OFF	s_uc_PortB &= ~0x04		// non utilisé : sur pin non câblée
+#define RM10_ON		s_uc_PortB |= 0x04		// non utilisé : sur pin non câblée
 
-#define RM11_INIT	TRISB &= ~0x04;			// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM11_OFF	s_uc_PortB &= ~0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM11_ON		s_uc_PortB |= 0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
+#define RM11_INIT	TRISB &= ~0x04;			// non utilisé : sur pin non câblée
+#define RM11_OFF	s_uc_PortB &= ~0x04		// non utilisé : sur pin non câblée
+#define RM11_ON		s_uc_PortB |= 0x04		// non utilisé : sur pin non câblée
 
-#define RM12_INIT	TRISB &= ~0x04;			// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM12_OFF	s_uc_PortB &= ~0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define RM12_ON		s_uc_PortB |= 0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
+#define RM12_INIT	TRISB &= ~0x04;			// non utilisé : sur pin non câblée
+#define RM12_OFF	s_uc_PortB &= ~0x04		// non utilisé : sur pin non câblée
+#define RM12_ON		s_uc_PortB |= 0x04		// non utilisé : sur pin non câblée
 
 
-// #define PWM_INIT_IN	TRISD |= 0x04;		// sera basculï¿½ en sortie ï¿½ la fin du 1er cycle
-#define PWM_INIT_OUT   	TRISD &= ~0x04;		// sera basculï¿½ en sortie ï¿½ la fin du 1er cycle
+// #define PWM_INIT_IN	TRISD |= 0x04;		// sera basculé en sortie à la fin du 1er cycle
+#define PWM_INIT_OUT   	TRISD &= ~0x04;		// sera basculé en sortie à la fin du 1er cycle
 #define RBSENS1_INIT	TRISD |= 0x04;
 #define RBSENS1_OFF		
 #define RBSENS1_ON		
@@ -645,9 +649,9 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 #define VARIATEUR2_OFF	s_uc_PortC &= ~0x01
 #define VARIATEUR2_ON	s_uc_PortC |= 0x01
 
-#define VARIATEUR3_INIT TRISB &= ~0x04;			// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define VARIATEUR3_OFF	s_uc_PortB &= ~0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
-#define VARIATEUR3_ON	s_uc_PortB |= 0x04		// non utilisï¿½ : sur pin non cï¿½blï¿½e
+#define VARIATEUR3_INIT TRISB &= ~0x04;			// non utilisé : sur pin non câblée
+#define VARIATEUR3_OFF	s_uc_PortB &= ~0x04		// non utilisé : sur pin non câblée
+#define VARIATEUR3_ON	s_uc_PortB |= 0x04		// non utilisé : sur pin non câblée
 
 #define LED_INIT	TRISD &= ~0x08;
 #define LED_OFF		s_uc_PortD &= ~0x08
@@ -657,17 +661,17 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 
 #ifdef TYPE_PIECES_DE_VIE_PROTO
 
-// boitier "piï¿½ces de vie" proto -----------------------------------------
+// boitier "pièces de vie" proto -----------------------------------------
 
 // adresse I2C
-#define I2C_ADDR    0x11	// boitier piï¿½ces de vie
+#define I2C_ADDR    0x11	// boitier pièces de vie
             //      0x12	// boitier chambres
-            //      0x13	// boitier piï¿½ces d'eau
+            //      0x13	// boitier pièces d'eau
 
 #define ENTREE_CONF_INIT	TRISB |= 0x0C;
 #define ENTREE_CONF_ETAT	(PORTB & 0x0C) >> 2
 
-// Entrï¿½es de la carte "Piï¿½ces de vie"
+// Entrées de la carte "Pièces de vie"
 #define ENTREE0_INIT		TRISB |= 0x01;
 #define ENTREE0_ETAT		(PORTB & 0x01)
 
@@ -735,7 +739,7 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 #define ENTREE21_ETAT		(PORTC & 0x08)	
 
 
-// Sorties de la carte "Piï¿½ces de vie"
+// Sorties de la carte "Pièces de vie"
 #define RM0_INIT	TRISA &= ~0x02;
 #define RM0_OFF		s_uc_PortA &= ~0x02
 #define RM0_ON		s_uc_PortA |= 0x02
@@ -792,7 +796,7 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 // par vrai PWM  #define RBSENS1_INIT	TRISC &= ~0x01;
 // par vrai PWM  #define RBSENS1_OFF		s_uc_PortC &= ~0x01
 // par vrai PWM  #define RBSENS1_ON		s_uc_PortC |= 0x01
-// par vrai PWM  sortie PWM soudï¿½e sur cette entrï¿½e
+// par vrai PWM  sortie PWM soudée sur cette entrée
 #define RBSENS1_INIT	TRISC |= 0x01;
 #define RBSENS1_OFF
 #define RBSENS1_ON
@@ -844,9 +848,9 @@ extern void vd_PiloteSortieVariateur(unsigned char uc_NumeroSortie,unsigned char
 // par vrai PWM  #define RB10_INIT		TRISD &= ~0x04;
 // par vrai PWM  #define RB10_OFF		s_uc_PortD &= ~0x04
 // par vrai PWM  #define RB10_ON			s_uc_PortD |= 0x04
-// par vrai PWM  RB10 non pilotï¿½ : besoin de la sortie PWM2
-#define PWM_INIT_IN		TRISD |= 0x04;		// sera basculï¿½ en sortie ï¿½ la fin du 1er cycle
-#define PWM_INIT_OUT	TRISD &= ~0x04;		// sera basculï¿½ en sortie ï¿½ la fin du 1er cycle
+// par vrai PWM  RB10 non piloté : besoin de la sortie PWM2
+#define PWM_INIT_IN		TRISD |= 0x04;		// sera basculé en sortie à la fin du 1er cycle
+#define PWM_INIT_OUT	TRISD &= ~0x04;		// sera basculé en sortie à la fin du 1er cycle
 #define RB10_INIT		TRISD |= 0x04;
 #define RB10_OFF
 #define RB10_ON

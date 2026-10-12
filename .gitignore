@@ -19,6 +19,12 @@ tests/ba/test_*
 !tests/ba/test_*.c
 tests/integration/test_*
 !tests/integration/test_*.c
+tests/i2c/test_*
+!tests/i2c/test_*.c
+tests/resil/test_*
+!tests/resil/test_*.c
+*.dSYM/
+ba/build/
 
 # macOS / editor / session junk
 .DS_Store

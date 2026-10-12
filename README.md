@@ -47,9 +47,42 @@ make -C tests/bp run_tests
 # Tests unitaires BA (4 suites, 19 tests)
 make -C tests/ba run_tests
 
-# Tests integration (3 suites, 11 tests)
+# Tests integration (3 suites)
 make -C tests/integration run_tests
+
+# Pilote I2C a attentes bornees + recuperation de bus (bus et horloge simules)
+make -C tests/i2c run_tests
+
+# Resilience BP <-> BA : commandes, resynchronisation, sante, index 12, cycle TE2
+make -C tests/resil run_tests
+
+# Cibles BA : une seule macro TYPE_* par carte, adresse I2C du type
+tests/ba/check_board_types.sh
 ```
+
+### Feature i2c-surge-protection-2026-10-007
+
+Refs essensys-hub/essensys-board-SC944D#1. Les tests `NR-gcc-1` a `NR-gcc-16`
+protegent :
+
+| Id | Comportement | Code |
+|---|---|---|
+| NR-gcc-1, -2 | Chaque attente I2C bornee a 2 ms, chaque transaction a 20 ms (ligne collee, etirement d'horloge) | `bp/drivers/i2c/i2c_pol_mcf52xx.c`, `bp/i2c/i2c_bounded.c` |
+| NR-gcc-3 | Recuperation de bus : 9 impulsions au plus, STOP, `I2CR` a 0 puis `IEN`, 1 tentative/s au plus | `bp/i2c/i2c_bounded.c` |
+| NR-gcc-4 | Reinitialisation du canal sans fuite ni pointeur perime (10 000 cycles) | `bp/app/ba_resil.c` |
+| NR-gcc-5 | Commandes conservees jusqu'a acquittement, etat final seul, volets expires apres 5 min | `bp/app/ba_resil.c` |
+| NR-gcc-6 | Resynchronisation : demarrage, retour a OK, drapeau de redemarrage d'un BA 1.8 | `bp/app/ba_resil.c` |
+| NR-gcc-7 | Sante OK/SUSPECT/ABSENT, presence <= 60 s, index 12 (`0x1C`) au codage inchange | `bp/app/ba_resil.c` |
+| NR-gcc-8 a -11 | Cycle TE2 : 60 s de blocage, 1 h d'ecart, 3 par 24 h persistants, suspension, J58 | `bp/app/ba_resil.c` |
+| NR-gcc-12 a -15 | BA 1.8 : LED d'etat, 6e octet `comm_stat`, NACK si `CmdBuf` occupe, timeout et erreurs SSP | `ba/source/` |
+| NR-gcc-16 | Une macro `TYPE_*` par cible BA, adresse 0x11 / 0x12 / 0x13 | `ba/Makefile`, `ba/source/hard.h` |
+
+`bp/app/ba_resil.[ch]` et `bp/i2c/i2c_bounded.h` sont la source de reference ;
+client-essensys-legacy en embarque une copie (`scripts/sync-from-essensys-gcc.sh`).
+
+**Aucun binaire produit ici n'est qualifie.** Le BP reste en 099-37 et aucun BA
+n'est reflashe tant que la suite NR sur banc (`NR-board-sc944d-*`) n'est pas
+au vert (taches 5.12 et 7.x du change OpenSpec).
 
 ## Validation
 

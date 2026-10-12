@@ -12,7 +12,7 @@
 
 VERSION  ?= dev
 
-.PHONY: all build-bp build-ba test test-coverage coverage misra clean
+.PHONY: all build-bp build-ba test test-bp test-ba test-integration test-i2c test-resil test-board-types test-coverage coverage misra clean
 
 all: build-bp build-ba
 
@@ -30,7 +30,7 @@ ba: build-ba
 
 # === TEST TARGETS ===
 
-test: test-bp test-ba test-integration
+test: test-bp test-ba test-integration test-i2c test-resil test-board-types
 
 test-bp:
 	$(MAKE) -C tests/bp run_tests
@@ -40,6 +40,19 @@ test-ba:
 
 test-integration:
 	$(MAKE) -C tests/integration run_tests
+
+# Feature i2c-surge-protection-2026-10-007 (Refs essensys-hub/essensys-board-SC944D#1)
+# Pilote I2C a attentes bornees + recuperation de bus, sur bus simule.
+test-i2c:
+	$(MAKE) -C tests/i2c run_tests
+
+# Resilience BP <-> BA : commandes, resynchronisation, sante, index 12, TE2.
+test-resil:
+	$(MAKE) -C tests/resil run_tests
+
+# Build BA : une seule macro TYPE_* par cible, adresse I2C du type.
+test-board-types:
+	tests/ba/check_board_types.sh
 
 # === COVERAGE TARGETS ===
 

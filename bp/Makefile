@@ -60,7 +60,10 @@ INCLUDES = \
   -I ../mqx/config/common \
   -I $(BSP_DIR) \
   -I $(IO)/serial \
+  -I i2c \
+  -I app \
   -I $(IO)/i2c \
+  -I $(IO)/i2c/polled \
   -I $(IO)/spi_legacy \
   -I $(IO)/spi_legacy/polled \
   -I $(IO)/gpio \
@@ -104,6 +107,11 @@ BSP_S_SRC   = $(wildcard $(BSP_DIR)/*.S)
 # --- Compat layer ----------------------------------------------------------
 COMPAT_SRC  = compat/newlib_stubs.c compat/cf_assert.c
 
+# --- Essensys : pilote I2C a attentes bornees (feature i2c-surge-protection-2026-10-007)
+# drivers/i2c/i2c_pol_mcf52xx.c remplace $(IO)/i2c/polled/i2c_pol_mcf52xx.c
+# (cinq boucles d'attente infinies bornees en temps, voir i2c/i2c_bounded.h).
+ESS_I2C_SRC = drivers/i2c/i2c_pol_mcf52xx.c i2c/i2c_bounded.c i2c/i2c_bounded_mcf5225.c
+
 # --- IO drivers (MCF5225x / MCF52xx variants only) -------------------------
 IO_C_SRC = \
   $(wildcard $(IO)/io_*.c) \
@@ -115,7 +123,6 @@ IO_C_SRC = \
   $(IO)/serial/polled/serl_pol_mcf52xx.c \
   $(IO)/i2c/i2c_mcf5225.c \
   $(IO)/i2c/polled/i2c_pol.c \
-  $(IO)/i2c/polled/i2c_pol_mcf52xx.c \
   $(IO)/i2c/int/i2c_int.c \
   $(IO)/i2c/int/i2c_int_mcf52xx.c \
   $(IO)/spi_legacy/spi_mcf5225_qspi.c \
@@ -194,7 +201,7 @@ RTCS_C_SRC = \
 # --- Application (minimal test application, will be replaced with full sources) ---
 # bootloader.c emits the fixed-address header sections (.APP_CRC/.APP_VERSION/
 # .APP_JUMP @ 0x3000) that the existing bootloader reads before launching.
-APP_SRC  = main.c bootloader.c
+APP_SRC  = main.c bootloader.c app/ba_resil.c
 APP_OBJS = $(addprefix $(BUILDDIR)/, $(APP_SRC:.c=.o))
 
 # ===========================================================================
@@ -213,6 +220,7 @@ PSP_OBJS  = $(patsubst ../%, $(BUILDDIR)/%, $(PSP_C_SRC:.c=.o)) \
 BSP_OBJS  = $(addprefix $(BUILDDIR)/, $(BSP_C_SRC:.c=.o)) \
             $(addprefix $(BUILDDIR)/, $(BSP_S_SRC:.S=.asm.o)) \
             $(addprefix $(BUILDDIR)/, $(COMPAT_SRC:.c=.o)) \
+            $(addprefix $(BUILDDIR)/, $(ESS_I2C_SRC:.c=.o)) \
             $(patsubst ../%, $(BUILDDIR)/%, $(IO_C_SRC:.c=.o)) \
             $(patsubst ../%, $(BUILDDIR)/%, $(FIO_C_SRC:.c=.o))
 

@@ -34,6 +34,21 @@
 #include "i2c_pol_prv.h"
 #include "i2c_mcf52xx_prv.h"
 
+/*
+ * Essensys -- feature i2c-surge-protection-2026-10-007
+ * (Refs essensys-hub/essensys-board-SC944D#1)
+ *
+ * Copie du pilote MQX 4.2 dont les cinq boucles d'attente infinies sont
+ * remplacees par des attentes bornees dans le temps (i2c_bounded.h) :
+ *   - 2 ms au plus par attente d'un evenement du controleur ;
+ *   - 20 ms au plus par transaction encadree par i2cb_txn_begin/end.
+ * En cas de depassement, l'operation se termine en erreur, le controleur
+ * abandonne la transaction et une recuperation de bus est demandee.
+ */
+#include "i2c_bounded.h"
+
+static void _mcf52xx_i2c_polled_abort (VMCF52XX_I2C_STRUCT_PTR, VMCF52XX_I2C_INFO_STRUCT_PTR, int);
+
 
 extern uint32_t _mcf52xx_i2c_polled_init (MCF52XX_I2C_INIT_STRUCT_PTR, void **, char *);
 extern uint32_t _mcf52xx_i2c_polled_deinit (IO_I2C_POLLED_DEVICE_STRUCT_PTR, VMCF52XX_I2C_INFO_STRUCT_PTR);
@@ -348,12 +363,27 @@ uint32_t _mcf52xx_i2c_polled_ioctl
    switch (cmd) 
    {
       case IO_IOCTL_FLUSH_OUTPUT:
+      {
+         i2cb_deadline_t dl;
+         i2cb_wait_begin (&dl);
          do 
          {
             for (tmp = 0; tmp < 0xFF; tmp++) 
                { };
             tmp = i2c_ptr->I2SR;
+            if (i2cb_wait_expired (&dl))
+            {
+               /* Attente bornee : bus ou esclave bloque */
+               _mcf52xx_i2c_polled_abort (i2c_ptr, io_info_ptr, I2CB_SITE_FLUSH);
+               io_info_ptr->TX_IN = io_info_ptr->TX_OUT;
+               if (NULL != param_ptr)
+               {
+                  *param_ptr = MCF52XX_I2C_I2SR_RXAK;   /* vu comme non acquitte */
+               }
+               return I2C_ERROR_LINE_TIMEOUT;
+            }
          } while ((i2c_ptr->I2CR & MCF52XX_I2C_I2CR_MTX) && ((MCF52XX_I2C_I2SR_IBB == (tmp & (MCF52XX_I2C_I2SR_ICF | MCF52XX_I2C_I2SR_IBB))) || (io_info_ptr->TX_IN != io_info_ptr->TX_OUT)));
+      }
          io_info_ptr->TX_IN = io_info_ptr->TX_OUT;
          if ((io_info_ptr->OPERATION & I2C_OPERATION_STARTED) && (0 == (tmp & MCF52XX_I2C_I2SR_IBB)))
          {
@@ -400,16 +430,27 @@ uint32_t _mcf52xx_i2c_polled_ioctl
          for (tmp = 0; tmp < 0xFF; tmp++) 
             { };
 
-         /* Wait for bus idle */
-         tmp = i2c_ptr->I2SR;
-         while (tmp & MCF52XX_I2C_I2SR_IBB)
-         { 
-            if (tmp & MCF52XX_I2C_I2SR_IIF)
-            {
-               i2c_ptr->I2SR &= (~ MCF52XX_I2C_I2SR_IIF);
-               tmp = (uint8_t)i2c_ptr->I2DR;
-            }
+         /* Wait for bus idle (attente bornee) */
+         {
+            i2cb_deadline_t dl;
+            i2cb_wait_begin (&dl);
             tmp = i2c_ptr->I2SR;
+            while (tmp & MCF52XX_I2C_I2SR_IBB)
+            { 
+               if (tmp & MCF52XX_I2C_I2SR_IIF)
+               {
+                  i2c_ptr->I2SR &= (~ MCF52XX_I2C_I2SR_IIF);
+                  tmp = (uint8_t)i2c_ptr->I2DR;
+               }
+               if (i2cb_wait_expired (&dl))
+               {
+                  _mcf52xx_i2c_polled_abort (i2c_ptr, io_info_ptr, I2CB_SITE_STOP_IDLE);
+                  io_info_ptr->STATE = I2C_STATE_READY;
+                  result = I2C_ERROR_LINE_TIMEOUT;
+                  break;
+               }
+               tmp = i2c_ptr->I2SR;
+            }
          }
          break;
       case IO_IOCTL_I2C_SET_RX_REQUEST:
@@ -625,8 +666,19 @@ uint32_t _mcf52xx_i2c_polled_rx
          io_info_ptr->OPERATION |= I2C_OPERATION_STARTED;
          i2c_ptr->I2DR = (io_info_ptr->ADDRESSEE << 1) | I2C_OPERATION_READ;
          io_info_ptr->STATISTICS.TX_PACKETS++;
-         while (0 == (i2c_ptr->I2SR & MCF52XX_I2C_I2SR_IIF)) 
-            { };   /* wait for address transferred */
+         {
+            i2cb_deadline_t dl;
+            i2cb_wait_begin (&dl);
+            while (0 == (i2c_ptr->I2SR & MCF52XX_I2C_I2SR_IIF))
+            {
+               /* wait for address transferred (attente bornee) */
+               if (i2cb_wait_expired (&dl))
+               {
+                  _mcf52xx_i2c_polled_abort (i2c_ptr, io_info_ptr, I2CB_SITE_RX_ADDR);
+                  return 0;
+               }
+            }
+         }
       }
    }
 
@@ -683,8 +735,19 @@ uint32_t _mcf52xx_i2c_polled_tx
          io_info_ptr->OPERATION |= I2C_OPERATION_STARTED;
          i2c_ptr->I2DR = (io_info_ptr->ADDRESSEE << 1) | I2C_OPERATION_WRITE;
          io_info_ptr->STATISTICS.TX_PACKETS++;
-         while (0 == (i2c_ptr->I2SR & MCF52XX_I2C_I2SR_IIF))
-            { };   /* wait for address transferred */
+         {
+            i2cb_deadline_t dl;
+            i2cb_wait_begin (&dl);
+            while (0 == (i2c_ptr->I2SR & MCF52XX_I2C_I2SR_IIF))
+            {
+               /* wait for address transferred (attente bornee) */
+               if (i2cb_wait_expired (&dl))
+               {
+                  _mcf52xx_i2c_polled_abort (i2c_ptr, io_info_ptr, I2CB_SITE_TX_ADDR);
+                  return 0;
+               }
+            }
+         }
       }
    }
 
@@ -722,9 +785,18 @@ static uint32_t _mcf52xx_i2c_polled_rx_tx
 
    for (i = 0; i <= length; i++)
    {
+      i2cb_deadline_t dl;
+      i2cb_wait_begin (&dl);
       do 
       {
          i2csr = i2c_ptr->I2SR;
+         if ((0 == (i2csr & MCF52XX_I2C_I2SR_IIF)) && i2cb_wait_expired (&dl))
+         {
+            /* Attente bornee : octet jamais termine (ligne collee ou
+               etirement d'horloge excessif) */
+            _mcf52xx_i2c_polled_abort (i2c_ptr, io_info_ptr, I2CB_SITE_RXTX_BYTE);
+            return i;
+         }
          if (0 == (i2c_ptr->I2CR & MCF52XX_I2C_I2CR_MSTA))
          {
             if (i == length)
@@ -1004,5 +1076,33 @@ static uint32_t _mcf52xx_i2c_polled_rx_tx
    }
    return length;
 } /* Endbody */
+
+
+/*FUNCTION****************************************************************
+* 
+* Function Name    : _mcf52xx_i2c_polled_abort
+* Returned Value   : none
+* Comments         : 
+*   Essensys : abandon d'une operation apres depassement d'une attente
+*   bornee. Le maitre relache le bus (MSTA a 0 genere un STOP si le bus le
+*   permet), l'etat logiciel revient a FINISHED, le depassement est compte
+*   et une recuperation de bus est demandee (i2cb_poll).
+*
+*END*********************************************************************/
+
+static void _mcf52xx_i2c_polled_abort
+   (
+      VMCF52XX_I2C_STRUCT_PTR      i2c_ptr,
+      VMCF52XX_I2C_INFO_STRUCT_PTR io_info_ptr,
+      int                          site
+   )
+{
+   i2c_ptr->I2CR &= (~ (MCF52XX_I2C_I2CR_MSTA | MCF52XX_I2C_I2CR_MTX | MCF52XX_I2C_I2CR_TXAK | MCF52XX_I2C_I2CR_RSTA));
+   i2c_ptr->I2SR &= (~ (MCF52XX_I2C_I2SR_IAL | MCF52XX_I2C_I2SR_IIF));
+   io_info_ptr->OPERATION = 0;
+   io_info_ptr->RX_REQUEST = 0;
+   io_info_ptr->STATE = I2C_STATE_FINISHED;
+   i2cb_note_timeout (site);
+}
 
 /* EOF */

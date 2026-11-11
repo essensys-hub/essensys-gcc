@@ -25,10 +25,13 @@ extern void __boot(void);
 __attribute__((section(".APP_CRC"), used))
 const unsigned short APP_CRC = 0x0102;
 
-/* 0x3002 — firmware version. Placeholder for this minimal build; the
- * metier build supplies the real us_BP_VERSION_SERVEUR. */
+/* 0x3002 — firmware version : us_BP_VERSION_SERVEUR de global.h, passé par
+ * bp/Makefile (BP_APP_VERSION), comme dans le bootloader.c CodeWarrior. */
+#ifndef BP_APP_VERSION
+#define BP_APP_VERSION 0
+#endif
 __attribute__((section(".APP_VERSION"), used))
-const unsigned short APP_VERSION = 0x0000;
+const unsigned short APP_VERSION = BP_APP_VERSION;
 
 /* 0x3004 — `jmp __boot` trampoline. m68k-elf-gcc ignores the `naked`
  * attribute, but at -Os this leaf function needs no frame, so GCC emits the

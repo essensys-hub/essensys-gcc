@@ -29,6 +29,9 @@
 #include "bsp.h"
 #include "bsp_prv.h"
 #include "rtc.h"
+#if BSPCFG_ENABLE_PWM
+#include "pwm_mcf5225.h"
+#endif
 
 const char      *_mqx_bsp_revision = REAL_NUM_TO_STR(BSP_REVISION);
 const char      *_mqx_io_revision  = REAL_NUM_TO_STR(IO_REVISION);
@@ -146,6 +149,11 @@ int _bsp_init(void) {
    /* GPIO */
 #if BSPCFG_ENABLE_GPIODEV
    _io_gpio_install("gpio:");
+#endif
+
+   /* PWM (sirène), pilote Essensys : drivers/pwm/pwm_mcf5225.c */
+#if BSPCFG_ENABLE_PWM
+   _io_pwm_install("pwm:");
 #endif
 
    /* Internal flash */

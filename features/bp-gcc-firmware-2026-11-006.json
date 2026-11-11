@@ -1,0 +1,125 @@
+{
+  "$schema": "./schema/feature.schema.json",
+  "id": "bp-gcc-firmware-2026-11-006",
+  "title": "Compiler le firmware 099-37 du BP avec la chaîne GCC open source",
+  "status": "proposed",
+  "owner": "nrineau",
+  "github": {
+    "issue": "essensys-hub/essensys-feature-lifecycle#66",
+    "project_item": "PVTI_lADODqt0Wc4BavHTzhH713I"
+  },
+  "git": {
+    "branch": "feat/bp-gcc-firmware-2026-11-006",
+    "pr_url": null
+  },
+  "openspec": {
+    "change_id": "bp-gcc-firmware-2026-11-006",
+    "path": "openspec/changes/bp-gcc-firmware-2026-11-006",
+    "proposal": "openspec/changes/bp-gcc-firmware-2026-11-006/proposal.md",
+    "design": "openspec/changes/bp-gcc-firmware-2026-11-006/design.md",
+    "tasks": "openspec/changes/bp-gcc-firmware-2026-11-006/tasks.md",
+    "specs": [
+      "openspec/changes/bp-gcc-firmware-2026-11-006/specs/bp-gcc-firmware/spec.md"
+    ]
+  },
+  "implementation": {
+    "paths": [
+      "openspec/changes/bp-gcc-firmware-2026-11-006/tasks.md",
+      "bp/Makefile"
+    ],
+    "primary_surface": "ops"
+  },
+  "userguide": {
+    "pages": [
+      "README.md"
+    ],
+    "language": "fr",
+    "i18n_keys": [],
+    "screenshots": []
+  },
+  "tests": {
+    "playwright": [],
+    "junit": [],
+    "coverage_must_test": [
+      "build bp lie les sources 099-37",
+      "espion serie present avec DEBUG",
+      "pilote pwm programme les registres",
+      "artefact dans la zone application avec CRC valide",
+      "rapport map contre xmap"
+    ],
+    "smoke_tags": [
+      "@nr"
+    ]
+  },
+  "release": {
+    "changelog_entry": "Firmware du BP 099-37 compilé avec la chaîne GCC open source.",
+    "target_tag": null,
+    "surfaces": [],
+    "paths": []
+  },
+  "security": {
+    "sca_tool": "dependabot+trivy",
+    "dependabot_alerts_url": "https://github.com/essensys-hub/essensys-gcc/security/dependabot",
+    "last_scan_at": null,
+    "cve_findings": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "secret_scan": {
+      "status": "warning",
+      "tool": "gitleaks",
+      "last_scan_at": null
+    },
+    "muted_findings": [],
+    "threat_model_url": null,
+    "owner_security": "rhinosys"
+  },
+  "bricks": {
+    "cloud": {
+      "scope": "not-concerned",
+      "reason": "aucun changement d'API ni de protocole"
+    },
+    "portail-cloud": {
+      "scope": "not-concerned",
+      "reason": "aucune interface"
+    },
+    "gateway-cm5": {
+      "scope": "not-concerned",
+      "reason": "le protocole BP ↔ gateway ne change pas"
+    },
+    "raspberry-pi": {
+      "scope": "not-concerned",
+      "reason": "rien n'est installé sur le Raspberry"
+    },
+    "ansible": {
+      "scope": "not-concerned",
+      "reason": "rien n'est déployé : aucun flash prévu"
+    },
+    "android": {
+      "scope": "not-concerned",
+      "reason": "aucun usage mobile"
+    },
+    "iphone": {
+      "scope": "not-concerned",
+      "reason": "aucun usage mobile"
+    },
+    "site-support": {
+      "scope": "not-concerned",
+      "reason": "outil réservé aux mainteneurs"
+    },
+    "documentation": {
+      "scope": "concerned",
+      "issue": "essensys-hub/essensys-doc#41"
+    },
+    "memoire": {
+      "scope": "concerned",
+      "issue": "essensys-hub/essensys-memory#39"
+    },
+    "firmware": {
+      "scope": "concerned",
+      "issue": "essensys-hub/essensys-gcc#16"
+    }
+  }
+}

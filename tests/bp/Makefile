@@ -2,7 +2,7 @@ CC      = cc
 CFLAGS  = -Wall -Wextra -g -DUNIT_TEST -I ../stubs -I ../unity/src
 UNITY   = ../unity/src/unity.c
 
-TESTS = test_crc test_json test_md5 test_base64 test_aes test_s19 test_table
+TESTS = test_crc test_json test_md5 test_base64 test_aes test_s19 test_table test_pwm
 
 .PHONY: run_tests clean
 
@@ -15,3 +15,6 @@ test_%: test_%.c $(UNITY)
 
 clean:
 	rm -f $(TESTS)
+
+test_pwm: test_pwm.c ../../bp/drivers/pwm/pwm_core.c $(UNITY)
+	$(CC) $(CFLAGS) -o $@ $^

@@ -56,6 +56,8 @@ INCLUDES = \
   -I compat \
   -I $(MQX_SRC)/include \
   -I $(MQX_SRC)/psp/coldfire \
+  -I config \
+  -I drivers/pwm \
   -I ../mqx/config/twrmcf52259 \
   -I ../mqx/config/common \
   -I $(BSP_DIR) \
@@ -198,11 +200,19 @@ RTCS_C_SRC = \
   $(wildcard $(RTCS_SRC)/snmp/*.c) \
   $(wildcard $(RTCS_SRC)/tcpip/*.c)
 
-# --- Application (minimal test application, will be replaced with full sources) ---
+# --- Application : firmware 099-37 du BP (feature bp-gcc-firmware-2026-11-006) ---
 # bootloader.c emits the fixed-address header sections (.APP_CRC/.APP_VERSION/
 # .APP_JUMP @ 0x3000) that the existing bootloader reads before launching.
-APP_SRC  = main.c bootloader.c app/ba_resil.c
+APP_SC944D = app/sc944d
+APP_SRC  = bootloader.c app/ba_resil.c compat/mqx38_rtc.c compat/sbrk.c drivers/pwm/pwm_mcf5225.c drivers/pwm/pwm_core.c \
+  $(filter-out $(APP_SC944D)/C/bootloader.c,$(wildcard $(APP_SC944D)/C/*.c)) \
+  $(wildcard $(APP_SC944D)/Ethernet/*.c)
 APP_OBJS = $(addprefix $(BUILDDIR)/, $(APP_SRC:.c=.o))
+BP_APP_VERSION := $(shell sed -n 's/.*define[[:space:]]*us_BP_VERSION_SERVEUR[[:space:]]*\([0-9]*\).*/\1/p' $(APP_SC944D)/H/global.h)
+$(BUILDDIR)/bootloader.o: CFLAGS += -DBP_APP_VERSION=$(BP_APP_VERSION)
+# Sources 099-37 : types MQX 3.8, configuration de la cible Int_Flash_Debug.
+$(APP_OBJS): CFLAGS += -fcommon -DDEBUG -include compat/mqx38_compat.h \
+  -I $(APP_SC944D)/H -I $(APP_SC944D)/Ethernet -I drivers/pwm
 
 # ===========================================================================
 #  Object file lists
@@ -232,19 +242,30 @@ ALL_OBJS  = $(PSP_OBJS) $(BSP_OBJS) $(RTCS_OBJS) $(APP_OBJS)
 #  Build targets
 # ===========================================================================
 
-.PHONY: all build size clean patch
+.PHONY: check all build size clean patch
 
 all: build
 
-build: patch $(ARTIFACT_DIR)/$(TARGET_ELF) $(ARTIFACT_DIR)/$(TARGET_S19) size
+build: patch $(ARTIFACT_DIR)/$(TARGET_ELF) $(ARTIFACT_DIR)/$(TARGET_S19) size check
 	@echo "✓ BP firmware built: $(ARTIFACT_DIR)/$(TARGET_ELF)"
 	@echo "✓ S-record: $(ARTIFACT_DIR)/$(TARGET_S19)"
+
+# Contrôle de l'artefact et injection du CRC (scripts/bp_artifact.py).
+# REF_XMAP=<.xMAP CodeWarrior> ajoute la comparaison des symboles.
+TARGET_S19_CRC = $(ARTIFACT_BASE)-$(VERSION)-crc.s19
+check: $(ARTIFACT_DIR)/$(TARGET_S19)
+	$(CROSS)nm $(ARTIFACT_DIR)/$(TARGET_ELF) > $(ARTIFACT_DIR)/$(ARTIFACT_BASE)-$(VERSION).nm
+	python3 ../scripts/bp_artifact.py $< --version $(BP_APP_VERSION) \
+	  --out $(ARTIFACT_DIR)/$(TARGET_S19_CRC) \
+	  $(if $(REF_XMAP),--map $(ARTIFACT_DIR)/$(ARTIFACT_BASE)-$(VERSION).nm --ref-xmap $(REF_XMAP))
 
 patch: .mqx_patched
 
 .mqx_patched:
 	@echo "Applying MQX GCC compatibility patches..."
-	@cd ../mqx && git apply ../bp/patches/0001-mqx-gcc-compat.patch || true
+	@cd ../mqx && ( git apply --reverse --check ../bp/patches/0001-mqx-gcc-compat.patch 2>/dev/null \
+	  || git apply ../bp/patches/0001-mqx-gcc-compat.patch ) \
+	  || { echo "ERREUR : patch MQX non applicable (sous-module absent ou worktree hors volume ?)"; exit 1; }
 	@touch .mqx_patched
 
 # --- Static libraries ------------------------------------------------------

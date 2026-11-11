@@ -54,16 +54,18 @@ jobs:
         run: docker run --rm -v ${{ github.workspace }}:/workspace essensys-bp-builder make -C /workspace bp
 
       - name: Report size
-        run: docker run --rm -v ${{ github.workspace }}:/workspace essensys-bp-builder m68k-elf-size /workspace/bp/BP_MQX_ETH.elf
+        run: docker run --rm -v ${{ github.workspace }}:/workspace essensys-bp-builder m68k-elf-size /workspace/bp/build/bp/BP_MQX_ETH-dev.elf
 
       - name: Upload artefacts BP
         uses: actions/upload-artifact@v4
         with:
           name: BP_MQX_ETH
           path: |
-            bp/BP_MQX_ETH.elf
-            bp/BP_MQX_ETH.s19
-            bp/BP_MQX_ETH.map
+            bp/build/bp/BP_MQX_ETH-dev.elf
+            bp/build/bp/BP_MQX_ETH-dev.s19
+            bp/build/bp/BP_MQX_ETH-dev-crc.s19
+            bp/build/bp/BP_MQX_ETH-dev.map
+          if-no-files-found: error
           retention-days: 30
 
   # Job 3 : Build BA x3 (Docker + XC8, matrice)

@@ -263,8 +263,10 @@ patch: .mqx_patched
 
 .mqx_patched:
 	@echo "Applying MQX GCC compatibility patches..."
-	@cd ../mqx && ( git apply --reverse --check ../bp/patches/0001-mqx-gcc-compat.patch 2>/dev/null \
-	  || git apply ../bp/patches/0001-mqx-gcc-compat.patch ) \
+	@# MQX est stocké en CRLF, le patch en LF : --ignore-whitespace évite de
+	@# dépendre du réglage core.autocrlf de la machine (la CI n'en a pas).
+	@cd ../mqx && ( git apply --ignore-whitespace --reverse --check ../bp/patches/0001-mqx-gcc-compat.patch 2>/dev/null \
+	  || git apply --ignore-whitespace ../bp/patches/0001-mqx-gcc-compat.patch ) \
 	  || { echo "ERREUR : patch MQX non applicable (sous-module absent ou worktree hors volume ?)"; exit 1; }
 	@touch .mqx_patched
 
